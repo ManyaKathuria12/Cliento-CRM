@@ -40,6 +40,9 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     // 🔥 user save
     localStorage.setItem("user", JSON.stringify(data.user));
+    if (data.token) {
+      localStorage.setItem("token", data.token);
+    }
 
     // 🔥 role-based redirect
     if (data.user.role === "admin") {

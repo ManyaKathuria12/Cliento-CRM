@@ -11,6 +11,7 @@ const dealRoutes = require("./routes/deals");
 const taskRoutes = require("./routes/tasks");
 const dashboardRoutes = require("./routes/dashboard");
 const userRoutes = require("./routes/userRoutes");
+const publicRoutes = require("./routes/public");
 
 
 
@@ -45,6 +46,7 @@ mongoose.connect("mongodb://127.0.0.1:27017/cliento")
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
+app.use("/api/public", publicRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api", userRoutes);

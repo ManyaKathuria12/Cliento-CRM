@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const Task = require("../models/Task");
+const authMiddleware = require("../middleware/auth");
+
+router.use(authMiddleware);
 
 // 🔥 GET all tasks
 router.get("/", async (req, res) => {
@@ -20,6 +23,7 @@ router.post("/", async (req, res) => {
 
     // ✅ ADD THIS
     req.app.get("io").emit("tasksUpdated");
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
     res.json(task);
   } catch (err) {
@@ -55,6 +59,7 @@ router.put("/:id", async (req, res) => {
     await task.save();
 
     req.app.get("io").emit("tasksUpdated");
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
     res.json(task);
   } catch (err) {
@@ -67,9 +72,9 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     await Task.findByIdAndDelete(req.params.id);
-
     // ✅ ADD THIS
     req.app.get("io").emit("tasksUpdated");
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
     res.json({ message: "Task deleted ✅" });
   } catch (err) {

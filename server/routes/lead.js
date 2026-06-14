@@ -1,7 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const Lead = require("../models/Lead");
+const authMiddleware = require("../middleware/auth");
 
+router.use(authMiddleware);
 
 console.log("MODEL:", Lead); // 🔥 debug
 // GET
@@ -44,7 +46,10 @@ router.post("/", async (req, res) => {
 
     console.log("SAVED:", lead);
 
-    res.json(lead);
+      // notify sockets
+      try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+
+      res.json(lead);
   } catch (err) {
     console.log(err);
     res.status(500).json({ error: "Save failed ❌" });
@@ -56,6 +61,7 @@ router.post("/", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     await Lead.findByIdAndDelete(req.params.id);
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
     res.json({ message: "Deleted ✅" });
   } catch (err) {
     console.log(err);
@@ -76,6 +82,7 @@ router.put("/:id", async (req, res) => {
 
     console.log("UPDATED =>", updated);
 
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
     res.json(updated);
   } catch (err) {
     console.log(err);

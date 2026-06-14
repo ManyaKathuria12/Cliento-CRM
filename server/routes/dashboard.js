@@ -5,58 +5,53 @@ const Lead = require("../models/Lead");
 const Deal = require("../models/Deal");
 const Task = require("../models/Task");
 const User = require("../models/User");
+const authMiddleware = require("../middleware/auth");
 
+router.use(authMiddleware);
 
 router.get("/stats", async (req, res) => {
   try {
     const totalLeads = await Lead.countDocuments();
+    const totalDeals = await Deal.countDocuments();
+    const totalContacts = await require("../models/Contact").countDocuments();
+    const totalTasks = await Task.countDocuments();
+
+    const completedTasks = await Task.countDocuments({ $or: [{ done: true }, { status: "done" }] });
+    const pendingTasks = await Task.countDocuments({ status: { $in: ["todo", "progress"] } });
+
     const deals = await Deal.find();
-
-    // 💰 revenue
-    const revenue = deals.reduce(
-      (sum, d) => sum + Number(d.value || 0),
-      0
-    );
-
-    // 📦 active deals
+    const wonDeals = deals.filter(d => d.stage === "won").length;
     const activeDeals = deals.filter(d => d.stage !== "won").length;
 
-    // 📊 conversion rate
-    const wonDeals = deals.filter(d => d.stage === "won").length;
-    const conversionRate = totalLeads
-      ? ((wonDeals / totalLeads) * 100).toFixed(1)
-      : 0;
+    // revenue (sum numeric values)
+    const revenue = deals.reduce((sum, d) => sum + Number(d.value || 0), 0);
 
-    // 📈 MONTHLY REVENUE
+    const conversionRate = totalLeads ? Number(((wonDeals / totalLeads) * 100).toFixed(1)) : 0;
+
+    // monthly aggregates (optional)
     const monthlyRevenue = await Deal.aggregate([
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          total: { $sum: { $toDouble: "$value" } }
-        }
-      },
+      { $group: { _id: { $month: "$createdAt" }, total: { $sum: { $toDouble: "$value" } } } },
       { $sort: { _id: 1 } }
     ]);
 
-    // 📊 MONTHLY LEADS
     const monthlyLeads = await Lead.aggregate([
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          total: { $sum: 1 }
-        }
-      },
+      { $group: { _id: { $month: "$createdAt" }, total: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]);
 
-    // 🔥 FINAL RESPONSE
     res.json({
       totalLeads,
+      totalDeals,
+      totalContacts,
+      totalTasks,
+      completedTasks,
+      pendingTasks,
+      wonDeals,
+      activeDeals,
       revenue,
       conversionRate,
-      activeDeals,
-      monthlyRevenue, // 🔥 ADD
-      monthlyLeads,   // 🔥 ADD
+      monthlyRevenue,
+      monthlyLeads,
     });
 
   } catch (err) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, Phone, Mail, MapPin, Building } from "lucide-react";
+import { getAuthHeaders } from "@/utils/api";
 
 const phoneRegex = /^\d{10}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -24,7 +25,7 @@ const Contacts = () => {
 
   // 🔥 FETCH FROM BACKEND
   const fetchContacts = async () => {
-    const res = await fetch("http://localhost:5000/api/contacts");
+    const res = await fetch("http://localhost:5000/api/contacts", { headers: getAuthHeaders() });
     const data = await res.json();
     setContacts(data);
   };
@@ -55,13 +56,13 @@ const Contacts = () => {
     if (editingContact) {
       await fetch(`http://localhost:5000/api/contacts/${editingContact._id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(form),
       });
     } else {
       await fetch("http://localhost:5000/api/contacts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(form),
       });
       fetchContacts();
@@ -78,6 +79,7 @@ const Contacts = () => {
 
     await fetch(`http://localhost:5000/api/contacts/${id}`, {
       method: "DELETE",
+      headers: getAuthHeaders(),
     });
     setSelectedContact(null);
     fetchContacts();

@@ -3,6 +3,9 @@ const router = express.Router();
 const Deal = require("../models/Deal");
 const Lead = require("../models/Lead");
 const mongoose = require("mongoose");
+const authMiddleware = require("../middleware/auth");
+
+router.use(authMiddleware);
 
 router.get("/", async (req, res) => {
   const deals = await Deal.find().populate("leadId");
@@ -36,6 +39,8 @@ router.post("/", async (req, res) => {
 
     // 🔥 Update lead status
     await Lead.findByIdAndUpdate(leadId, { status: "converted" });
+
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
     res.json(deal);
   } catch (err) {
@@ -75,6 +80,8 @@ router.put("/:id", async (req, res) => {
       { new: true }
     );
 
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+
     res.json(updated);
   } catch (err) {
     console.log("UPDATE ERROR:", err);
@@ -85,6 +92,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     await Deal.findByIdAndDelete(req.params.id);
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
     res.json({ message: "Deal deleted successfully" });
   } catch (err) {
     console.log(err);

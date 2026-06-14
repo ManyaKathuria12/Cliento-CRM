@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const Contact = require("../models/Contact");
+const authMiddleware = require("../middleware/auth");
+
+router.use(authMiddleware);
 
 // 🔥 CHECK MODEL
 console.log("MODEL:", Contact);
@@ -25,6 +28,8 @@ router.post("/", async (req, res) => {
 
     console.log("SAVED:", contact);
 
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+
     res.json(contact);
   } catch (err) {
     console.log(err);
@@ -36,6 +41,7 @@ router.post("/", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     await Contact.findByIdAndDelete(req.params.id);
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
     res.json({ message: "Deleted ✅" });
   } catch (err) {
     console.log(err);
@@ -51,6 +57,7 @@ router.put("/:id", async (req, res) => {
       req.body,
       { new: true }
     );
+    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
     res.json(updated);
   } catch (err) {
     console.log(err);

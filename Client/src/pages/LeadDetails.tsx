@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { getAuthHeaders } from "@/utils/api";
 import {
   ArrowLeft,
   Building2,
@@ -51,7 +52,8 @@ const LeadDetails = () => {
   const fetchLead = async () => {
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/leads/${id}`
+        `http://localhost:5000/api/leads/${id}`,
+        { headers: getAuthHeaders() }
       );
 
       setLead(res.data);
@@ -87,7 +89,8 @@ const LeadDetails = () => {
     city: formData.city,
     email: formData.email,
     source: formData.source,
-  }
+  },
+        { headers: getAuthHeaders() }
       );
 
       setLead(res.data);
@@ -111,7 +114,8 @@ const LeadDetails = () => {
         value: 50000,
         contact: lead?.phone,
         stage: "New",
-      }
+      },
+      { headers: getAuthHeaders() }
     );
 
     if (
@@ -142,7 +146,8 @@ const handleDelete = async () => {
 
   try {
     await axios.delete(
-      `http://localhost:5000/api/leads/${id}`
+      `http://localhost:5000/api/leads/${id}`,
+      { headers: getAuthHeaders() }
     );
 
     alert("Lead deleted successfully");

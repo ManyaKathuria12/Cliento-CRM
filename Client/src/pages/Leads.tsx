@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, Filter, Grid3X3, List, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getAuthHeaders } from "@/utils/api";
 
 const Leads = () => {
   const [view, setView] = useState<"table" | "cards">("table");
@@ -24,7 +25,7 @@ const [source, setSource] = useState("");
 
   // 🔥 FETCH
   const fetchLeads = () => {
-    fetch("http://localhost:5000/api/leads")
+    fetch("http://localhost:5000/api/leads", { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => setLeads(data))
       .catch(err => console.error(err));
@@ -41,9 +42,7 @@ const [source, setSource] = useState("");
 
     fetch("http://localhost:5000/api/leads", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
     body: JSON.stringify({
   name: toTitleCase(name),
   company: toTitleCase(company),

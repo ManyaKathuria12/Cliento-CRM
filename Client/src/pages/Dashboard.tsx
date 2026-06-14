@@ -1,6 +1,7 @@
 import { Users, IndianRupee, TrendingUp, Handshake, Clock, Sparkles } from "lucide-react";
 import KPICard from "@/components/KPICard";
 import { useEffect, useState } from "react";
+import { getAuthHeaders } from "@/utils/api";
 
 import {
   LineChart,
@@ -29,7 +30,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchTasks = async () => {
-      const res = await fetch("http://localhost:5000/api/dashboard/tasks-preview");
+      const res = await fetch("http://localhost:5000/api/dashboard/tasks-preview", { headers: getAuthHeaders() });
       const data = await res.json();
       setTasks(data);
     };
@@ -50,9 +51,8 @@ const Dashboard = () => {
     const fetchDealsAndContacts = async () => {
       try {
         const [dealsRes, contactsRes] = await Promise.all([
-          fetch("http://localhost:5000/api/deals"),
-          // server registers contacts under /api/contacts
-          fetch("http://localhost:5000/api/contacts"),
+          fetch("http://localhost:5000/api/deals", { headers: getAuthHeaders() }),
+          fetch("http://localhost:5000/api/contacts", { headers: getAuthHeaders() }),
         ]);
 
         const dealsData = await dealsRes.json();
@@ -134,7 +134,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/dashboard/stats");
+        const res = await fetch("http://localhost:5000/api/dashboard/stats", { headers: getAuthHeaders() });
         const data = await res.json();
         setStats(data);
       } catch (err) {

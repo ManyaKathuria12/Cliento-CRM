@@ -1,6 +1,7 @@
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useState, useEffect } from "react";
 import { IndianRupee, Calendar, User } from "lucide-react";
+import { getAuthHeaders } from "@/utils/api";
 
 interface Deal {
   id: string;
@@ -50,7 +51,7 @@ export default function Deals() {
 
   const fetchDeals = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/deals");
+      const res = await fetch("http://localhost:5000/api/deals", { headers: getAuthHeaders() });
       const data = await res.json();
       const items = Array.isArray(data) ? data : data?.deals || [];
       const cols = getInitialColumns() as any;
@@ -82,7 +83,7 @@ export default function Deals() {
 
   const fetchLeads = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/leads");
+      const res = await fetch("http://localhost:5000/api/leads", { headers: getAuthHeaders() });
       const data = await res.json();
       setLeads(data || []);
     } catch (err) {
@@ -110,7 +111,7 @@ export default function Deals() {
     // persist
     fetch(`http://localhost:5000/api/deals/${moved.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(moved),
     }).catch((e) => console.log(e));
   };
@@ -119,7 +120,7 @@ export default function Deals() {
     try {
       const res = await fetch("http://localhost:5000/api/deals", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newDeal),
       });
       const data = await res.json();
@@ -160,7 +161,7 @@ export default function Deals() {
   const deleteDeal = async () => {
     if (!dealToDelete) return;
     try {
-      await fetch(`http://localhost:5000/api/deals/${dealToDelete}`, { method: "DELETE" });
+      await fetch(`http://localhost:5000/api/deals/${dealToDelete}`, { method: "DELETE", headers: getAuthHeaders() });
       const updated = { ...columns } as any;
       Object.keys(updated).forEach((col) => {
         updated[col].deals = updated[col].deals.filter((d: Deal) => d.id !== dealToDelete);
@@ -180,7 +181,7 @@ export default function Deals() {
     try {
       const res = await fetch(`http://localhost:5000/api/deals/${selectedDeal.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(selectedDeal),
       });
       const updatedDeal = await res.json();
