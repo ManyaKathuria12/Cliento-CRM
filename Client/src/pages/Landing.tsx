@@ -76,7 +76,7 @@ const scrollToSection = (id: string) => {
 
 const Landing = () => {
   const navigate = useNavigate();
-  const { data, loading } = useDashboardStats(5000);
+  const { data, loading: overviewLoading, error: overviewError, refetch: refetchOverview } = useDashboardStats();
   const [activeSection, setActiveSection] = useState<string>("");
   const [selectedFeature, setSelectedFeature] = useState<typeof featuresData[0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -89,11 +89,10 @@ const Landing = () => {
     tasks: recentTasks,
     contacts: recentContacts,
     loading: activityLoading,
+    error: activityError,
     timeAgo,
-    tasksDueToday,
-    contactsThisMonth,
     refetch: refetchActivity,
-  } = useLiveActivity(30000);
+  } = useLiveActivity();
 
   // Active nav highlighting on scroll
   useEffect(() => {
@@ -149,12 +148,33 @@ const Landing = () => {
   // Handle refresh activity
   const handleRefreshActivity = async () => {
     try {
-      await refetchActivity();
-      toast.success("Activity data refreshed!");
-    } catch (error) {
+      await Promise.all([refetchActivity(), refetchOverview()]);
+      toast.success("CRM data refreshed!");
+    } catch {
       toast.error("Failed to refresh data");
     }
   };
+
+  const StatSkeleton = () => (
+    <div className="stat-card glass rounded-2xl p-6 border border-primary/10 min-h-[180px] flex flex-col justify-between animate-pulse">
+      <div className="flex items-center justify-between mb-4">
+        <div className="h-3 w-24 bg-muted/40 rounded" />
+        <div className="w-12 h-12 rounded-xl bg-muted/30" />
+      </div>
+      <div>
+        <div className="h-10 w-20 bg-muted/40 rounded mb-3" />
+        <div className="h-3 w-32 bg-muted/30 rounded" />
+      </div>
+    </div>
+  );
+
+  const ActivitySkeleton = () => (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-16 bg-muted/20 rounded-lg animate-pulse" />
+      ))}
+    </>
+  );
 
   // Handle footer navigation
   const handleFooterLink = (link: string) => {
@@ -228,8 +248,7 @@ const Landing = () => {
 
       {/* Hero */}
       <section className="pt-32 pb-16 px-6 relative overflow-hidden sm:pt-40 sm:pb-20">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
-        <div className="absolute top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -254,12 +273,6 @@ const Landing = () => {
             >
               Start Free Trial <ArrowRight size={18} />
             </Link>
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 glass px-8 py-3 rounded-xl font-medium text-foreground hover:bg-secondary transition-all hover:shadow-md text-base cursor-pointer"
-            >
-              Login
-            </Link>
             <button 
               onClick={() => scrollToSection('features')}
               onKeyDown={(e) => e.key === 'Enter' && scrollToSection('features')}
@@ -274,7 +287,8 @@ const Landing = () => {
 
       {/* Live CRM Overview - Premium Dashboard Card */}
       <section id="overview" className="py-20 px-6 relative scroll-mt-20">
-        <div className="max-w-[1400px] mx-auto w-full">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+        <div className="max-w-[1400px] mx-auto w-full relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -295,9 +309,28 @@ const Landing = () => {
                 <span className="hidden sm:inline">Login required to access full CRM data.</span>
               </div>
             </div>
+
+            {overviewError && (
+              <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center justify-between gap-4">
+                <span>Unable to load CRM overview: {overviewError}</span>
+                <button
+                  onClick={refetchOverview}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors text-xs font-medium"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
             
             {/* 3x2 Responsive Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {overviewLoading ? (
+                <>
+                  <StatSkeleton /><StatSkeleton /><StatSkeleton />
+                  <StatSkeleton /><StatSkeleton /><StatSkeleton />
+                </>
+              ) : (
+              <>
               {/* Total Leads */}
               <motion.button
                 whileHover={{ y: -4 }}
@@ -315,8 +348,8 @@ const Landing = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gradient">{loading ? '—' : data?.totalLeads ?? 0}</div>
-                  <div className="text-sm text-muted-foreground mt-3">+12 this month</div>
+                  <div className="text-4xl font-bold text-gradient">{data?.totalLeads ?? 0}</div>
+                  <div className="text-sm text-muted-foreground mt-3">Across all pipelines</div>
                 </div>
               </motion.button>
 
@@ -337,8 +370,8 @@ const Landing = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gradient">{loading ? '—' : data?.activeDeals ?? 0}</div>
-                  <div className="text-sm text-muted-foreground mt-3">{data?.wonDeals ?? 0} won this period</div>
+                  <div className="text-4xl font-bold text-gradient">{data?.activeDeals ?? 0}</div>
+                  <div className="text-sm text-muted-foreground mt-3">In progress</div>
                 </div>
               </motion.button>
 
@@ -359,8 +392,8 @@ const Landing = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gradient">{loading ? '—' : `₹${data?.revenue ?? 0}`}</div>
-                  <div className="text-sm text-muted-foreground mt-3">+₹45000 this month</div>
+                  <div className="text-4xl font-bold text-gradient">₹{(data?.totalRevenue ?? 0).toLocaleString("en-IN")}</div>
+                  <div className="text-sm text-muted-foreground mt-3">Pipeline value</div>
                 </div>
               </motion.button>
 
@@ -381,8 +414,8 @@ const Landing = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gradient">{loading ? '—' : `${data?.conversionRate ?? 0}%`}</div>
-                  <div className="text-sm text-muted-foreground mt-3">{data?.wonDeals ?? 0} deals converted</div>
+                  <div className="text-4xl font-bold text-gradient">{data?.conversionRate ?? 0}%</div>
+                  <div className="text-sm text-muted-foreground mt-3">Lead to win rate</div>
                 </div>
               </motion.button>
 
@@ -403,8 +436,8 @@ const Landing = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gradient">{loading ? '—' : tasksDueToday ?? 0}</div>
-                  <div className="text-sm text-muted-foreground mt-3">{data?.pendingTasks ?? 0} tasks pending</div>
+                  <div className="text-4xl font-bold text-gradient">{data?.tasksDueToday ?? 0}</div>
+                  <div className="text-sm text-muted-foreground mt-3">Scheduled for today</div>
                 </div>
               </motion.button>
 
@@ -425,10 +458,12 @@ const Landing = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gradient">{loading ? '—' : contactsThisMonth ?? 0}</div>
+                  <div className="text-4xl font-bold text-gradient">{data?.newContacts ?? 0}</div>
                   <div className="text-sm text-muted-foreground mt-3">Added this month</div>
                 </div>
               </motion.button>
+              </>
+              )}
             </div>
           </motion.div>
         </div>
@@ -485,8 +520,9 @@ const Landing = () => {
       </section>
 
       {/* Live CRM Activity - 2x2 Layout */}
-      <section id="activity" className="py-20 px-6 scroll-mt-20">
-        <div className="max-w-[1400px] mx-auto w-full">
+      <section id="activity" className="py-20 px-6 relative scroll-mt-20">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+        <div className="max-w-[1400px] mx-auto w-full relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -500,6 +536,18 @@ const Landing = () => {
               Login required to access full CRM data.
             </div>
           </motion.div>
+
+          {activityError && (
+            <div className="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center justify-center gap-4 max-w-2xl mx-auto">
+              <span>Unable to load activity: {activityError}</span>
+              <button
+                onClick={refetchActivity}
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors text-xs font-medium"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           
           {/* 2x2 Responsive Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -526,13 +574,12 @@ const Landing = () => {
                 </button>
               </div>
               <div id="recent-leads" className="flex flex-col gap-4 flex-1 overflow-y-auto">
-                {activityLoading && Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-16 bg-muted/20 rounded-lg animate-pulse" />
-                ))}
-                {!activityLoading && (!leads || leads.length === 0) && (
+                {activityLoading ? (
+                  <ActivitySkeleton />
+                ) : leads.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">No recent leads yet</div>
-                )}
-                {!activityLoading && leads && leads.map((l) => (
+                ) : (
+                leads.map((l) => (
                   <motion.button
                     key={l.id}
                     whileHover={{ x: 4 }}
@@ -554,7 +601,8 @@ const Landing = () => {
                       </span>
                     </div>
                   </motion.button>
-                ))}
+                ))
+                )}
               </div>
             </motion.div>
 
@@ -571,13 +619,12 @@ const Landing = () => {
                 <p className="text-sm text-muted-foreground mt-1">Pipeline activity and stage updates</p>
               </div>
               <div id="recent-deals" className="flex flex-col gap-4 flex-1 overflow-y-auto">
-                {activityLoading && Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-16 bg-muted/20 rounded-lg animate-pulse" />
-                ))}
-                {!activityLoading && (!recentDeals || recentDeals.length === 0) && (
+                {activityLoading ? (
+                  <ActivitySkeleton />
+                ) : recentDeals.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">No recent deals</div>
-                )}
-                {!activityLoading && recentDeals && recentDeals.map((d) => (
+                ) : (
+                recentDeals.map((d) => (
                   <motion.button
                     key={d.id}
                     whileHover={{ x: 4 }}
@@ -599,7 +646,8 @@ const Landing = () => {
                       </span>
                     </div>
                   </motion.button>
-                ))}
+                ))
+                )}
               </div>
             </motion.div>
 
@@ -616,13 +664,12 @@ const Landing = () => {
                 <p className="text-sm text-muted-foreground mt-1">Upcoming and completed actions</p>
               </div>
               <div id="recent-tasks" className="flex flex-col gap-4 flex-1 overflow-y-auto">
-                {activityLoading && Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-16 bg-muted/20 rounded-lg animate-pulse" />
-                ))}
-                {!activityLoading && (!recentTasks || recentTasks.length === 0) && (
+                {activityLoading ? (
+                  <ActivitySkeleton />
+                ) : recentTasks.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">No recent tasks</div>
-                )}
-                {!activityLoading && recentTasks && recentTasks.map((t) => (
+                ) : (
+                recentTasks.map((t) => (
                   <motion.button
                     key={t.id}
                     whileHover={{ x: 4 }}
@@ -644,7 +691,8 @@ const Landing = () => {
                       </span>
                     </div>
                   </motion.button>
-                ))}
+                ))
+                )}
               </div>
             </motion.div>
 
@@ -661,13 +709,12 @@ const Landing = () => {
                 <p className="text-sm text-muted-foreground mt-1">New and updated contacts</p>
               </div>
               <div id="recent-contacts" className="flex flex-col gap-4 flex-1 overflow-y-auto">
-                {activityLoading && Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-16 bg-muted/20 rounded-lg animate-pulse" />
-                ))}
-                {!activityLoading && (!recentContacts || recentContacts.length === 0) && (
+                {activityLoading ? (
+                  <ActivitySkeleton />
+                ) : recentContacts.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">No recent contacts</div>
-                )}
-                {!activityLoading && recentContacts && recentContacts.map((c) => (
+                ) : (
+                recentContacts.map((c) => (
                   <motion.button
                     key={c.id}
                     whileHover={{ x: 4 }}
@@ -689,7 +736,8 @@ const Landing = () => {
                       </span>
                     </div>
                   </motion.button>
-                ))}
+                ))
+                )}
               </div>
             </motion.div>
           </div>
@@ -777,7 +825,7 @@ const Landing = () => {
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Lock size={28} className="text-primary" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground mb-2">Please login to access CRM records.</h2>
+                <h2 className="text-xl font-bold text-foreground mb-2">Login required to access CRM records</h2>
                 <p className="text-sm text-muted-foreground mb-6">
                   Sign in to view leads, deals, tasks, contacts, and full CRM details.
                 </p>
@@ -810,7 +858,7 @@ const Landing = () => {
 
       {/* Enhanced CTA Section */}
       <section className="py-20 px-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/5 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -853,19 +901,13 @@ const Landing = () => {
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6"
+                className="mt-6"
               >
                 <Link
                   to="/login"
                   className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-cyan text-primary-foreground px-10 py-4 rounded-xl font-semibold hover:opacity-90 transition-all hover:shadow-2xl text-lg cursor-pointer"
                 >
                   Start Free Trial <ArrowRight size={20} />
-                </Link>
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 glass px-10 py-4 rounded-xl font-medium text-foreground hover:bg-secondary transition-all text-lg cursor-pointer"
-                >
-                  Login
                 </Link>
               </motion.div>
             </div>
@@ -875,7 +917,8 @@ const Landing = () => {
 
       {/* Footer */}
       <footer className="border-t border-border/50 py-12 px-6 relative">
-        <div className="max-w-[1400px] mx-auto">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+        <div className="max-w-[1400px] mx-auto relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <Logo size="sm" />

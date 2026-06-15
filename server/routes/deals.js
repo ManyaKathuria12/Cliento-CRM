@@ -37,8 +37,16 @@ router.post("/", async (req, res) => {
 
     const deal = await Deal.create(dealData);
 
-    // 🔥 Update lead status
-    await Lead.findByIdAndUpdate(leadId, { status: "converted" });
+    // 🔥 Update lead status and activity
+    await Lead.findByIdAndUpdate(leadId, {
+      status: "converted",
+      $push: {
+        activity: {
+          action: "Converted to Deal",
+          timestamp: new Date()
+        }
+      }
+    });
 
     try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 

@@ -112,31 +112,6 @@ app.post("/forgot-password", async (req, res) => {
 
 
 
-// 📊 LEADS API
-let leads = [];
-
-app.get("/api/leads", (req, res) => {
-  res.json(leads);
-});
-
-app.post("/api/leads", (req, res) => {
-  const newLead = req.body;
-  leads.push(newLead);
-  res.json({ message: "Lead added", data: newLead });
-});
-
-app.delete("/api/leads/:id", (req, res) => {
-  const id = req.params.id;
-  leads.splice(id, 1);
-  res.json({ message: "Lead deleted" });
-});
-
-app.put("/api/leads/:id", (req, res) => {
-  const id = req.params.id;
-  leads[id] = req.body;
-  res.json({ message: "Lead updated", data: leads[id] });
-});
-
 // ✅ TEST
 app.get("/", (req, res) => {
   res.send("Backend running 🚀");

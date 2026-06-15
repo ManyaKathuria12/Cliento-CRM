@@ -147,7 +147,7 @@ const Dashboard = () => {
   if (!stats) return <p className="text-white">Loading...</p>;
 
   // 🔥 Month mapping (smooth charts)
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const revenueData = months.map((month, i) => {
     const found = stats?.monthlyRevenue?.find(m => m._id === i + 1);

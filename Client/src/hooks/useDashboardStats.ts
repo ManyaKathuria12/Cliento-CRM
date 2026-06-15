@@ -1,81 +1,44 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { io, Socket } from "socket.io-client";
 
-type Stats = {
+export type OverviewStats = {
   totalLeads: number;
-  totalDeals: number;
-  totalContacts: number;
-  totalTasks: number;
-  completedTasks: number;
-  pendingTasks: number;
-  wonDeals: number;
   activeDeals: number;
-  revenue: number;
+  totalRevenue: number;
   conversionRate: number;
+  tasksDueToday: number;
+  newContacts: number;
 };
 
-const API_BASE = import.meta.env.DEV ? "http://localhost:5000" : "";
+const POLL_MS = 30000;
 
-export default function useDashboardStats(pollInterval = 5000) {
-  const [data, setData] = useState<Stats | null>(null);
+export default function useDashboardStats(pollInterval = POLL_MS) {
+  const [data, setData] = useState<OverviewStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const socketRef = useRef<Socket | null>(null);
-  const pollingRef = useRef<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const initialLoad = useRef(true);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    if (initialLoad.current) setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE}/api/public/stats`);
-      setData(res.data as Stats);
+      const res = await axios.get<OverviewStats>("/api/public/overview");
+      setData(res.data);
       setError(null);
     } catch (err: any) {
-      setError(err);
-      setData(null);
+      setError(err?.response?.data?.message || err?.message || "Failed to load overview");
     } finally {
-      setLoading(false);
+      if (initialLoad.current) {
+        setLoading(false);
+        initialLoad.current = false;
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStats();
-
-    try {
-      const socket = io(API_BASE || "http://localhost:5000");
-      socketRef.current = socket;
-
-      socket.on("connect", () => {
-        fetchStats();
-      });
-
-      socket.on("dashboardUpdated", () => {
-        fetchStats();
-      });
-
-      socket.on("tasksUpdated", () => {
-        fetchStats();
-      });
-
-      const fallback = setTimeout(() => {
-        if (!socket.connected) {
-          pollingRef.current = window.setInterval(fetchStats, pollInterval);
-        }
-      }, 1500);
-
-      return () => {
-        clearTimeout(fallback);
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-        }
-        socket.disconnect();
-      };
-    } catch (e) {
-      pollingRef.current = window.setInterval(fetchStats, pollInterval);
-      return () => {
-        if (pollingRef.current) clearInterval(pollingRef.current);
-      };
-    }
-  }, []);
+    const interval = window.setInterval(fetchStats, pollInterval);
+    return () => clearInterval(interval);
+  }, [fetchStats, pollInterval]);
 
   return { data, loading, error, refetch: fetchStats };
 }

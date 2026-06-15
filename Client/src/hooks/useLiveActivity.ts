@@ -1,11 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { io, Socket } from "socket.io-client";
 import formatDistanceToNow from "date-fns/formatDistanceToNow";
 
-const API_BASE = import.meta.env.DEV ? "http://localhost:5000" : "";
-
-type PreviewRecord = {
+export type PreviewRecord = {
   id: string;
   label: string;
   status?: string;
@@ -15,33 +12,28 @@ type PreviewRecord = {
   createdAt?: string;
 };
 
-type ActivityResponse = {
+export type ActivityData = {
   leads: PreviewRecord[];
   deals: PreviewRecord[];
   tasks: PreviewRecord[];
   contacts: PreviewRecord[];
-  tasksDueToday: number;
-  contactsThisMonth: number;
 };
 
-export default function useLiveActivity(refreshMs = 30000) {
-  const [leads, setLeads] = useState<PreviewRecord[] | null>(null);
-  const [deals, setDeals] = useState<PreviewRecord[] | null>(null);
-  const [tasks, setTasks] = useState<PreviewRecord[] | null>(null);
-  const [contacts, setContacts] = useState<PreviewRecord[] | null>(null);
+const POLL_MS = 30000;
+
+export default function useLiveActivity(refreshMs = POLL_MS) {
+  const [leads, setLeads] = useState<PreviewRecord[]>([]);
+  const [deals, setDeals] = useState<PreviewRecord[]>([]);
+  const [tasks, setTasks] = useState<PreviewRecord[]>([]);
+  const [contacts, setContacts] = useState<PreviewRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const socketRef = useRef<Socket | null>(null);
-  const pollRef = useRef<number | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [tasksDueToday, setTasksDueToday] = useState(0);
-  const [contactsThisMonth, setContactsThisMonth] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const initialLoad = useRef(true);
 
   function idToDate(id: string) {
     try {
-      const ts = parseInt(id.substring(0, 8), 16) * 1000;
-      return new Date(ts);
-    } catch (e) {
+      return new Date(parseInt(id.substring(0, 8), 16) * 1000);
+    } catch {
       return new Date();
     }
   }
@@ -50,62 +42,35 @@ export default function useLiveActivity(refreshMs = 30000) {
     try {
       const d = date ? new Date(date) : id ? idToDate(id) : new Date();
       return formatDistanceToNow(d, { addSuffix: true });
-    } catch (e) {
+    } catch {
       return "just now";
     }
   };
 
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = useCallback(async () => {
+    if (initialLoad.current) setLoading(true);
     try {
-      const res = await axios.get<ActivityResponse>(`${API_BASE}/api/public/activity`);
-      const data = res.data;
-
-      setLeads(data.leads);
-      setDeals(data.deals);
-      setTasks(data.tasks);
-      setContacts(data.contacts);
-      setTasksDueToday(data.tasksDueToday);
-      setContactsThisMonth(data.contactsThisMonth);
-      setLastUpdated(new Date());
+      const res = await axios.get<ActivityData>("/api/public/activity");
+      setLeads(res.data.leads || []);
+      setDeals(res.data.deals || []);
+      setTasks(res.data.tasks || []);
+      setContacts(res.data.contacts || []);
       setError(null);
     } catch (err: any) {
-      setError(err as Error);
+      setError(err?.response?.data?.message || err?.message || "Failed to load activity");
     } finally {
-      setLoading(false);
+      if (initialLoad.current) {
+        setLoading(false);
+        initialLoad.current = false;
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAll();
-
-    try {
-      const socket = io(API_BASE || "http://localhost:5000");
-      socketRef.current = socket;
-
-      socket.on("connect", () => {
-        fetchAll();
-      });
-
-      socket.on("dashboardUpdated", () => fetchAll());
-      socket.on("tasksUpdated", () => fetchAll());
-
-      const fallback = setTimeout(() => {
-        if (!socket.connected) {
-          pollRef.current = window.setInterval(fetchAll, refreshMs);
-        }
-      }, 1500);
-
-      return () => {
-        clearTimeout(fallback);
-        if (pollRef.current) clearInterval(pollRef.current);
-        try { socket.disconnect(); } catch (e) {}
-      };
-    } catch (e) {
-      pollRef.current = window.setInterval(fetchAll, refreshMs);
-      return () => { if (pollRef.current) clearInterval(pollRef.current); };
-    }
-  }, []);
+    const interval = window.setInterval(fetchAll, refreshMs);
+    return () => clearInterval(interval);
+  }, [fetchAll, refreshMs]);
 
   return {
     leads,
@@ -116,8 +81,5 @@ export default function useLiveActivity(refreshMs = 30000) {
     error,
     refetch: fetchAll,
     timeAgo,
-    lastUpdated,
-    tasksDueToday,
-    contactsThisMonth,
   };
 }

@@ -6,6 +6,8 @@ import {
 import Logo from "./Logo";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import toast from "react-hot-toast";
 
 
 
@@ -20,6 +22,7 @@ const getNavItems = (role) => {
   if (role === "manager") {
     return [
       { label: "Dashboard", path: "/manager" },
+      { label: "Pipeline", path: "/pipeline" },
       { label: "Deals", path: "/deals" },
       { label: "Analytics", path: "/analytics" },
     ];
@@ -30,6 +33,7 @@ const getNavItems = (role) => {
     { label: "Dashboard", path: "/dashboard" },
     { label: "Leads", path: "/leads" },
     { label: "Contacts", path: "/contacts" },
+    { label: "Pipeline", path: "/pipeline" },
     { label: "Deals", path: "/deals" },
     { label: "Tasks", path: "/tasks" },
   ];
@@ -39,7 +43,9 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { user, logout } = useAuth();
+  const [customToast, setCustomToast] = useState<string | null>(null);
 const [notifications, setNotifications] = useState<
   { id: string; text: string; type: string }[]
 >([]);
@@ -95,14 +101,14 @@ const generateNotifications = (data: any) => {
 };
 
 useEffect(() => {
-  if (toast) {
+  if (customToast) {
     const timer = setTimeout(() => {
-      setToast("");
+      setCustomToast("");
     }, 3000);
 
     return () => clearTimeout(timer);
   }
-}, [toast]);
+}, [customToast]);
 
 useEffect(() => {
   const handleClick = (e: any) => {
@@ -138,11 +144,11 @@ useEffect(() => {
 }, [readNotifications]);
 
 useEffect(() => {
-  if (toast) {
-    const timer = setTimeout(() => setToast(null), 3000);
+  if (customToast) {
+    const timer = setTimeout(() => setCustomToast(null), 3000);
     return () => clearTimeout(timer);
   }
-}, [toast]);
+}, [customToast]);
 
 useEffect(() => {
   setReadNotifications((prev) =>
@@ -152,13 +158,6 @@ useEffect(() => {
   );
 }, [notifications]);
 
-  // 🔥 SAFE USER FETCH
-  let user = null;
-  try {
-    user = JSON.parse(localStorage.getItem("user") || "null");
-  } catch {
-    user = null;
-  }
   const role = user?.role || "sales";
   const navItems = getNavItems(role);
 
@@ -186,8 +185,13 @@ if (hasOverdue) {
 
   // 🔥 LOGOUT
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    navigate("/login");
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    logout();
+    toast.success("Logged out successfully");
+    navigate("/");
   };
 
   // 🔥 INITIALS
@@ -266,10 +270,7 @@ if (hasOverdue) {
           {/* 🔔 Notification */}
         <div className="relative flex items-center notification-box">
  <button
-  onClick={(e) => {
-    e.stopPropagation();
-    setOpen(!open);
-  }}
+  onClick={() => navigate("/notifications")}
   className="relative p-2 rounded-xl hover:bg-secondary transition-colors"
 >
   <Bell />
@@ -282,81 +283,6 @@ if (hasOverdue) {
   </span>
 )}
 </button>
-
-
-  
-
-  {/* 🔽 Dropdown */}
-  {open && (
-  <div className="absolute right-0 top-12 mt-2 w-80 bg-card border border-border rounded-xl p-4 shadow-xl z-50">
-
-<div className="flex justify-between items-center mb-4 border-b border-border pb-3">
-          <h3 className="text-sm font-semibold">Notifications</h3>
-
-          <div className="flex gap-3">
-            <button
-  onClick={() =>
-    setReadNotifications(notifications.map((n) => n.id))
-  }
-  className="text-primary hover:underline"
->
-  Mark all
-</button>
-
-           <button
-  onClick={() => {
-    setNotifications([]);
-    setReadNotifications([]);
-  }}
-  className="text-red-400 hover:underline"
->
-  Clear
-</button>
-          </div>
-        </div>
-        
- {notifications.length === 0 && (
-  <p className="text-xs text-muted-foreground">
-    No notifications
-  </p>
-)}
-
-{/* OVERDUE */}
-{overdue.length > 0 && (
-  <>
-    <p className="text-xs text-red-400 mb-2">Overdue</p>
-   {overdue.map((n) => (
-  <NotificationItem key={n.id} n={n} />
-))}
-  </>
-)}
-
-{/* TODAY */}
-{today.length > 0 && (
-  <>
-    <p className="text-xs text-yellow-400 mt-3 mb-2">Today</p>
-    {today.map((n) => (
-  <NotificationItem key={n.id} n={n} />
-))}
-  </>
-)}
-
-{/* UPCOMING */}
-{upcoming.length > 0 && (
-  <>
-    <p className="text-xs text-green-400 mb-2 mt-2 font-semibold">
-  Upcoming
-</p>
-   {upcoming.map((n) => (
-  <NotificationItem key={n.id} n={n} />
-))}
-  </>
-)}
-
-</div>
-
-    
-  )}
 </div>
 
           {/* 👤 USER NAME */}
@@ -414,18 +340,18 @@ if (hasOverdue) {
         </AnimatePresence>
       </main>
 
-   {toast && (
+   {customToast && (
   <div className="fixed bottom-6 right-6 bg-card border border-border px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-right fade-in z-50">
 
     {/* dot */}
     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
 
     {/* text */}
-    <p className="text-sm font-medium">{toast}</p>
+    <p className="text-sm font-medium">{customToast}</p>
 
     {/* close button (optional) */}
     <button
-      onClick={() => setToast("")}
+      onClick={() => setCustomToast("")}
       className="text-xs text-muted-foreground hover:text-white ml-2"
     >
       ✕
@@ -433,6 +359,46 @@ if (hasOverdue) {
 
   </div>
 )}
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowLogoutModal(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4"
+            >
+              <h2 className="text-xl font-bold text-foreground">Logout</h2>
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to logout?
+              </p>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="flex-1 bg-secondary border border-border text-foreground hover:bg-muted py-2.5 rounded-xl text-sm font-medium transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="flex-1 bg-destructive text-white hover:opacity-90 py-2.5 rounded-xl text-sm font-medium transition-all"
+                >
+                  Logout
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

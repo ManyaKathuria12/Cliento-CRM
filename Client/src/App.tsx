@@ -20,6 +20,7 @@ import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
 import Contacts from "./pages/Contacts";
 import Deals from "./pages/Deals";
+import Pipeline from "./pages/Pipeline";
 import Tasks from "./pages/Tasks";
 import Analytics from "./pages/Analytics";
 import AIChat from "./pages/AIChat";
@@ -28,6 +29,7 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import TaskDetail from "./pages/TaskDetail";
 import LeadDetails from "./pages/LeadDetails";
+import Notifications from "./pages/Notifications";
 
 
 const queryClient = new QueryClient();
@@ -46,7 +48,13 @@ const App = () => (
 
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Profile />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
             
             
 
@@ -87,8 +95,13 @@ const App = () => (
   </ProtectedRoute>
 } />
             <Route path="/deals" element={
-  <ProtectedRoute roleRequired="sales">
+  <ProtectedRoute roleRequired={["sales", "manager"]}>
     <DashboardLayout><Deals /></DashboardLayout>
+  </ProtectedRoute>
+} />
+            <Route path="/pipeline" element={
+  <ProtectedRoute roleRequired={["sales", "manager"]}>
+    <DashboardLayout><Pipeline /></DashboardLayout>
   </ProtectedRoute>
 } />
 
@@ -105,20 +118,26 @@ const App = () => (
 } />
 
 <Route path="/analytics" element={
-  <ProtectedRoute roleRequired="sales">
+  <ProtectedRoute roleRequired="manager">
     <DashboardLayout><Analytics /></DashboardLayout>
   </ProtectedRoute>
 } />
 
 <Route path="/ai-chat" element={
-  <ProtectedRoute roleRequired="sales">
+  <ProtectedRoute>
     <DashboardLayout><AIChat /></DashboardLayout>
   </ProtectedRoute>
 } />
 
 <Route path="/settings" element={
-  <ProtectedRoute roleRequired="sales">
+  <ProtectedRoute>
     <DashboardLayout><SettingsPage /></DashboardLayout>
+  </ProtectedRoute>
+} />
+
+<Route path="/notifications" element={
+  <ProtectedRoute>
+    <DashboardLayout><Notifications /></DashboardLayout>
   </ProtectedRoute>
 } />
 

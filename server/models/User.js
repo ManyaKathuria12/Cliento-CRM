@@ -11,6 +11,10 @@ const userSchema = new mongoose.Schema({
     enum: ["admin", "sales", "manager"],
     default: "sales",
   },
+  phone: String,
+  company: String,
+  jobTitle: String,
+  location: String,
 });
  
 

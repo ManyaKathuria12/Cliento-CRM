@@ -6,6 +6,32 @@ const Deal = require("../models/Deal");
 const Task = require("../models/Task");
 const Contact = require("../models/Contact");
 
+function idToDate(id) {
+  try {
+    return new Date(parseInt(id.toString().substring(0, 8), 16) * 1000);
+  } catch {
+    return null;
+  }
+}
+
+function isSameDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function isSameMonth(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function parseDueDate(due) {
+  if (!due) return null;
+  const parsed = new Date(due);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function maskLabel(name, fallback = "Record") {
   if (!name || typeof name !== "string") return `Anonymous ${fallback}`;
   const trimmed = name.trim();
@@ -15,111 +41,107 @@ function maskLabel(name, fallback = "Record") {
 
 function sanitizeLead(lead) {
   return {
-    id: lead._id,
+    id: String(lead._id),
     label: maskLabel(lead.name, "Lead"),
     status: lead.status || "new",
-    createdAt: lead.createdAt,
+    createdAt: lead.createdAt || idToDate(lead._id),
   };
 }
 
 function sanitizeDeal(deal) {
   return {
-    id: deal._id,
+    id: String(deal._id),
     label: maskLabel(deal.title, "Deal"),
     stage: deal.stage || "new",
-    createdAt: deal.createdAt,
+    createdAt: deal.createdAt || idToDate(deal._id),
   };
 }
 
 function sanitizeTask(task) {
   return {
-    id: task._id,
+    id: String(task._id),
     label: maskLabel(task.text, "Task"),
     status: task.done || task.status === "done" ? "done" : task.status || "todo",
     due: task.due,
-    createdAt: task.createdAt,
+    createdAt: task.createdAt || idToDate(task._id),
   };
 }
 
 function sanitizeContact(contact) {
   return {
-    id: contact._id,
+    id: String(contact._id),
     label: maskLabel(contact.name, "Contact"),
     role: contact.role || "contact",
-    createdAt: contact.createdAt,
+    createdAt: idToDate(contact._id),
   };
 }
 
-router.get("/stats", async (req, res) => {
+router.get("/overview", async (req, res) => {
   try {
-    const totalLeads = await Lead.countDocuments();
-    const totalDeals = await Deal.countDocuments();
-    const totalContacts = await Contact.countDocuments();
-    const totalTasks = await Task.countDocuments();
+    const [totalLeads, deals, allTasks, allContacts] = await Promise.all([
+      Lead.countDocuments(),
+      Deal.find().lean(),
+      Task.find().lean(),
+      Contact.find().lean(),
+    ]);
 
-    const completedTasks = await Task.countDocuments({ $or: [{ done: true }, { status: "done" }] });
-    const pendingTasks = await Task.countDocuments({ status: { $in: ["todo", "progress"] } });
+    const today = new Date();
+    const wonDeals = deals.filter((d) => (d.stage || "").toLowerCase() === "won").length;
+    const activeDeals = deals.filter((d) => {
+      const stage = (d.stage || "").toLowerCase();
+      return stage !== "won" && stage !== "lost";
+    }).length;
 
-    const deals = await Deal.find();
-    const wonDeals = deals.filter((d) => d.stage === "won").length;
-    const activeDeals = deals.filter((d) => d.stage !== "won" && d.stage !== "lost").length;
-    const revenue = deals.reduce((sum, d) => sum + Number(d.value || 0), 0);
-    const conversionRate = totalLeads ? Number(((wonDeals / totalLeads) * 100).toFixed(1)) : 0;
+    const totalRevenue = deals.reduce((sum, d) => {
+      const raw = String(d.value || "0").replace(/[^\d.]/g, "");
+      return sum + (Number(raw) || 0);
+    }, 0);
+
+    const conversionRate = totalLeads
+      ? Number(((wonDeals / totalLeads) * 100).toFixed(1))
+      : 0;
+
+    const tasksDueToday = allTasks.filter((t) => {
+      const due = parseDueDate(t.due);
+      return due ? isSameDay(due, today) : false;
+    }).length;
+
+    const newContacts = allContacts.filter((c) => {
+      const created = c.createdAt ? new Date(c.createdAt) : idToDate(c._id);
+      return created ? isSameMonth(created, today) : false;
+    }).length;
 
     res.json({
       totalLeads,
-      totalDeals,
-      totalContacts,
-      totalTasks,
-      completedTasks,
-      pendingTasks,
-      wonDeals,
       activeDeals,
-      revenue,
+      totalRevenue,
       conversionRate,
+      tasksDueToday,
+      newContacts,
     });
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Error fetching public stats" });
+    console.error("Public overview error:", err);
+    res.status(500).json({ message: "Error fetching public overview" });
   }
 });
 
 router.get("/activity", async (req, res) => {
   try {
     const [leads, deals, tasks, contacts] = await Promise.all([
-      Lead.find().sort({ _id: -1 }).limit(5),
-      Deal.find().sort({ createdAt: -1 }).limit(5),
-      Task.find().sort({ _id: -1 }).limit(5),
-      Contact.find().sort({ _id: -1 }).limit(5),
+      Lead.find().sort({ createdAt: -1, _id: -1 }).limit(5).lean(),
+      Deal.find().sort({ createdAt: -1, _id: -1 }).limit(5).lean(),
+      Task.find().sort({ _id: -1 }).limit(5).lean(),
+      Contact.find().sort({ _id: -1 }).limit(5).lean(),
     ]);
-
-    const today = new Date();
-    const tasksDueToday = tasks.filter((t) => {
-      if (!t.due) return false;
-      const due = new Date(t.due);
-      return (
-        due.getFullYear() === today.getFullYear() &&
-        due.getMonth() === today.getMonth() &&
-        due.getDate() === today.getDate()
-      );
-    }).length;
-
-    const contactsThisMonth = contacts.filter((c) => {
-      const created = c.createdAt ? new Date(c.createdAt) : null;
-      if (!created) return false;
-      return created.getFullYear() === today.getFullYear() && created.getMonth() === today.getMonth();
-    }).length;
 
     res.json({
       leads: leads.map(sanitizeLead),
       deals: deals.map(sanitizeDeal),
       tasks: tasks.map(sanitizeTask),
       contacts: contacts.map(sanitizeContact),
-      tasksDueToday,
-      contactsThisMonth,
     });
   } catch (err) {
-    console.log(err);
+    console.error("Public activity error:", err);
     res.status(500).json({ message: "Error fetching public activity" });
   }
 });
