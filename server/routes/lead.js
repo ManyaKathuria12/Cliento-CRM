@@ -3,6 +3,7 @@ const router = express.Router();
 const Lead = require("../models/Lead");
 const Deal = require("../models/Deal");
 const authMiddleware = require("../middleware/auth");
+const { notify } = require("../utils/notifier");
 
 router.use(authMiddleware);
 
@@ -64,6 +65,8 @@ router.post("/", async (req, res) => {
     // notify sockets
     try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
+    await notify(req.app, "Lead Created 👤", `Lead "${lead.name}" representing "${lead.company || 'Individual'}" was created.`, "lead", "medium");
+
     res.json(lead);
   } catch (err) {
     console.log(err);
@@ -74,8 +77,12 @@ router.post("/", async (req, res) => {
 // DELETE LEAD
 router.delete("/:id", async (req, res) => {
   try {
-    await Lead.findByIdAndDelete(req.params.id);
-    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+    const lead = await Lead.findById(req.params.id);
+    if (lead) {
+      await Lead.findByIdAndDelete(req.params.id);
+      try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+      await notify(req.app, "Lead Deleted 🗑️", `Lead "${lead.name}" was deleted.`, "lead", "low");
+    }
     res.json({ message: "Deleted ✅" });
   } catch (err) {
     console.log(err);
@@ -127,6 +134,8 @@ router.put("/:id", async (req, res) => {
     console.log("UPDATED =>", lead);
 
     try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+
+    await notify(req.app, "Lead Updated 👤", `Lead "${lead.name}" was updated.`, "lead", "low");
     
     // Perform linked deal check to return same shape as GET /:id
     const deal = await Deal.findOne({ leadId: lead._id });

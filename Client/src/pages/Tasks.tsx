@@ -278,6 +278,47 @@ const Tasks = () => {
   const completedTasksCount = tasks.filter(t => t.done || t.status === "done").length;
   const overdueTasksCount = tasks.filter(t => !t.done && t.status !== "done" && isOverdue(t.due)).length;
 
+  // Client-side MoM calculations
+  const calculateChange = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? { change: "100.0%", changeType: "up" as const } : { change: "0.0%", changeType: "neutral" as const };
+    const percent = ((curr - prev) / prev) * 100;
+    return {
+      change: `${Math.abs(percent).toFixed(1)}%`,
+      changeType: (curr >= prev ? "up" : "down") as "up" | "down" | "neutral"
+    };
+  };
+
+  const now = new Date();
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const currentMonthTasks = tasks.filter(t => t.createdAt && new Date(t.createdAt) >= startOfCurrentMonth);
+  const previousMonthTasks = tasks.filter(t => {
+    if (!t.createdAt) return false;
+    const d = new Date(t.createdAt);
+    return d >= startOfPreviousMonth && d < startOfCurrentMonth;
+  });
+
+  // Current Month Stats
+  const currTotal = currentMonthTasks.length;
+  const currPending = currentMonthTasks.filter(t => !t.done && t.status === "todo").length;
+  const currProgress = currentMonthTasks.filter(t => !t.done && t.status === "progress").length;
+  const currCompleted = currentMonthTasks.filter(t => t.done || t.status === "done").length;
+  const currOverdue = currentMonthTasks.filter(t => !t.done && t.status !== "done" && isOverdue(t.due)).length;
+
+  // Previous Month Stats
+  const prevTotal = previousMonthTasks.length;
+  const prevPending = previousMonthTasks.filter(t => !t.done && t.status === "todo").length;
+  const prevProgress = previousMonthTasks.filter(t => !t.done && t.status === "progress").length;
+  const prevCompleted = previousMonthTasks.filter(t => t.done || t.status === "done").length;
+  const prevOverdue = previousMonthTasks.filter(t => !t.done && t.status !== "done" && isOverdue(t.due)).length;
+
+  const totalTasksMom = calculateChange(currTotal, prevTotal);
+  const pendingTasksMom = calculateChange(currPending, prevPending);
+  const progressTasksMom = calculateChange(currProgress, prevProgress);
+  const completedTasksMom = calculateChange(currCompleted, prevCompleted);
+  const overdueTasksMom = calculateChange(currOverdue, prevOverdue);
+
   return (
     <div className="min-h-[calc(100vh-80px)] px-6 lg:px-8 bg-gradient-to-br from-[#07131c] via-[#061018] to-[#02060a] py-6 space-y-6">
       {/* HEADER */}
@@ -296,11 +337,11 @@ const Tasks = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KPICard icon={Users} title="Total Tasks" value={`${totalTasksCount}`} change="0" changeType="up" />
-        <KPICard icon={Clock} title="Pending Tasks" value={`${pendingTasksCount}`} change="0" changeType="up" />
-        <KPICard icon={PlayCircle} title="In Progress" value={`${progressTasksCount}`} change="0" changeType="up" />
-        <KPICard icon={CheckSquare} title="Completed" value={`${completedTasksCount}`} change="0" changeType="up" />
-        <KPICard icon={AlertTriangle} title="Overdue Tasks" value={`${overdueTasksCount}`} change="0" changeType="up" />
+        <KPICard icon={Users} title="Total Tasks" value={`${totalTasksCount}`} change={totalTasksMom.change} changeType={totalTasksMom.changeType} />
+        <KPICard icon={Clock} title="Pending Tasks" value={`${pendingTasksCount}`} change={pendingTasksMom.change} changeType={pendingTasksMom.changeType} />
+        <KPICard icon={PlayCircle} title="In Progress" value={`${progressTasksCount}`} change={progressTasksMom.change} changeType={progressTasksMom.changeType} />
+        <KPICard icon={CheckSquare} title="Completed" value={`${completedTasksCount}`} change={completedTasksMom.change} changeType={completedTasksMom.changeType} />
+        <KPICard icon={AlertTriangle} title="Overdue Tasks" value={`${overdueTasksCount}`} change={overdueTasksMom.change} changeType={overdueTasksMom.changeType} />
       </div>
 
       {/* Filter and Sort Controls */}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Phone, Mail, MapPin, Building } from "lucide-react";
+import { Search, Plus, Phone, Mail, MapPin, Building, Users, Clock, Sparkles } from "lucide-react";
 import { getAuthHeaders } from "@/utils/api";
+import KPICard from "@/components/KPICard";
 
 const phoneRegex = /^\d{10}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,6 +18,7 @@ const emptyForm = {
 const Contacts = () => {
   const [search, setSearch] = useState("");
   const [contacts, setContacts] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingContact, setEditingContact] = useState<any | null>(null);
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
@@ -25,9 +27,23 @@ const Contacts = () => {
 
   // 🔥 FETCH FROM BACKEND
   const fetchContacts = async () => {
-    const res = await fetch("http://localhost:5000/api/contacts", { headers: getAuthHeaders() });
-    const data = await res.json();
-    setContacts(data);
+    try {
+      const res = await fetch("http://localhost:5000/api/contacts", { headers: getAuthHeaders() });
+      const data = await res.json();
+      setContacts(data || []);
+    } catch (err) {
+      console.error("Error loading contacts list", err);
+    }
+
+    try {
+      const res = await fetch("http://localhost:5000/api/contacts/stats", { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error("Error loading contacts stats", err);
+    }
   };
 
   useEffect(() => {
@@ -117,6 +133,14 @@ const Contacts = () => {
         </button>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in duration-300 mb-6">
+        <KPICard icon={Users} title="Total Contacts" value={stats ? `${stats.totalContacts}` : "0"} change={stats ? stats.contactsChange : "0.0%"} changeType={stats ? stats.contactsChangeType : "neutral"} />
+        <KPICard icon={Building} title="Companies Count" value={stats ? `${stats.companiesCount}` : "0"} change={stats ? stats.companiesChange : "0.0%"} changeType={stats ? stats.companiesChangeType : "neutral"} />
+        <KPICard icon={Clock} title="Recent Contacts" value={stats ? `${stats.recentContacts}` : "0"} change={stats ? stats.recentContactsChange : "0.0%"} changeType={stats ? stats.recentContactsChangeType : "neutral"} />
+        <KPICard icon={Sparkles} title="Active Contacts" value={stats ? `${stats.activeContacts}` : "0"} change={stats ? stats.activeContactsChange : "0.0%"} changeType={stats ? stats.activeContactsChangeType : "neutral"} />
+      </div>
+
       {/* SEARCH */}
       <div className="relative max-w-sm">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -129,6 +153,7 @@ const Contacts = () => {
       </div>
 
       {/* GRID */}
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filtered.map((c) => (
           <div

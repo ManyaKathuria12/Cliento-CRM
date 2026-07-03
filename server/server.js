@@ -12,6 +12,7 @@ const taskRoutes = require("./routes/tasks");
 const dashboardRoutes = require("./routes/dashboard");
 const userRoutes = require("./routes/userRoutes");
 const publicRoutes = require("./routes/public");
+const notificationRoutes = require("./routes/notifications");
 
 
 
@@ -32,7 +33,10 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-  console.log("User connected");
+  console.log("Socket connected", socket.id);
+  socket.on("disconnect", (reason) => {
+    console.log("Socket disconnected", socket.id, reason);
+  });
 });
 
 app.set("io", io);
@@ -49,6 +53,7 @@ app.use("/uploads", express.static("uploads"));
 app.use("/api/public", publicRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api", userRoutes);
 
 

@@ -163,6 +163,45 @@ const Leads = () => {
   const convertedLeadsCount = leads.filter(l => l.status?.toLowerCase() === "converted").length;
   const conversionRateVal = totalLeadsCount > 0 ? ((convertedLeadsCount / totalLeadsCount) * 100).toFixed(1) + "%" : "0.0%";
 
+  // Client-side MoM calculations
+  const calculateChange = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? { change: "100.0%", changeType: "up" as const } : { change: "0.0%", changeType: "neutral" as const };
+    const percent = ((curr - prev) / prev) * 100;
+    return {
+      change: `${Math.abs(percent).toFixed(1)}%`,
+      changeType: (curr >= prev ? "up" : "down") as "up" | "down" | "neutral"
+    };
+  };
+
+  const now = new Date();
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const currentMonthLeads = leads.filter(l => l.createdAt && new Date(l.createdAt) >= startOfCurrentMonth);
+  const previousMonthLeads = leads.filter(l => {
+    if (!l.createdAt) return false;
+    const d = new Date(l.createdAt);
+    return d >= startOfPreviousMonth && d < startOfCurrentMonth;
+  });
+
+  const currentTotal = currentMonthLeads.length;
+  const currentNew = currentMonthLeads.filter(l => l.status?.toLowerCase() === "new").length;
+  const currentQualified = currentMonthLeads.filter(l => l.status?.toLowerCase() === "qualified").length;
+  const currentConverted = currentMonthLeads.filter(l => l.status?.toLowerCase() === "converted").length;
+  const currentConvRate = currentTotal > 0 ? (currentConverted / currentTotal) * 100 : 0;
+
+  const previousTotal = previousMonthLeads.length;
+  const previousNew = previousMonthLeads.filter(l => l.status?.toLowerCase() === "new").length;
+  const previousQualified = previousMonthLeads.filter(l => l.status?.toLowerCase() === "qualified").length;
+  const previousConverted = previousMonthLeads.filter(l => l.status?.toLowerCase() === "converted").length;
+  const previousConvRate = previousTotal > 0 ? (previousConverted / previousTotal) * 100 : 0;
+
+  const totalLeadsMom = calculateChange(currentTotal, previousTotal);
+  const newLeadsMom = calculateChange(currentNew, previousNew);
+  const qualifiedLeadsMom = calculateChange(currentQualified, previousQualified);
+  const convertedLeadsMom = calculateChange(currentConverted, previousConverted);
+  const convRateMom = calculateChange(currentConvRate, previousConvRate);
+
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -182,11 +221,11 @@ const Leads = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KPICard icon={Users} title="Total Leads" value={`${totalLeadsCount}`} change="0" changeType="up" />
-        <KPICard icon={UserPlus} title="New Leads" value={`${newLeadsCount}`} change="0" changeType="up" />
-        <KPICard icon={UserCheck} title="Qualified Leads" value={`${qualifiedLeadsCount}`} change="0" changeType="up" />
-        <KPICard icon={Handshake} title="Converted Leads" value={`${convertedLeadsCount}`} change="0" changeType="up" />
-        <KPICard icon={TrendingUp} title="Conversion Rate" value={conversionRateVal} change="0" changeType="up" />
+        <KPICard icon={Users} title="Total Leads" value={`${totalLeadsCount}`} change={totalLeadsMom.change} changeType={totalLeadsMom.changeType} />
+        <KPICard icon={UserPlus} title="New Leads" value={`${newLeadsCount}`} change={newLeadsMom.change} changeType={newLeadsMom.changeType} />
+        <KPICard icon={UserCheck} title="Qualified Leads" value={`${qualifiedLeadsCount}`} change={qualifiedLeadsMom.change} changeType={qualifiedLeadsMom.changeType} />
+        <KPICard icon={Handshake} title="Converted Leads" value={`${convertedLeadsCount}`} change={convertedLeadsMom.change} changeType={convertedLeadsMom.changeType} />
+        <KPICard icon={TrendingUp} title="Conversion Rate" value={conversionRateVal} change={convRateMom.change} changeType={convRateMom.changeType} />
       </div>
 
       {/* Controls Bar */}

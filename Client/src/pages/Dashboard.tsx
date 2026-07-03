@@ -2,6 +2,7 @@ import { Users, IndianRupee, TrendingUp, Handshake, Clock, Sparkles } from "luci
 import KPICard from "@/components/KPICard";
 import { useEffect, useState } from "react";
 import { getAuthHeaders } from "@/utils/api";
+import { io } from "socket.io-client";
 
 import {
   LineChart,
@@ -19,143 +20,54 @@ const Dashboard = () => {
   const user = JSON.parse(localStorage.getItem("user"));
   const role = user?.role;
 
-  const [stats, setStats] = useState(null);
-
-  const [tasks, setTasks] = useState([]);
-  const [deals, setDeals] = useState([]);
-  const [contacts, setContacts] = useState([]);
-  const [activities, setActivities] = useState([]);
-  const [wonDealsCount, setWonDealsCount] = useState(0);
-  const [totalContacts, setTotalContacts] = useState(0);
+  const [stats, setStats] = useState<any>(null);
+  const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      const res = await fetch("http://localhost:5000/api/dashboard/tasks-preview", { headers: getAuthHeaders() });
-      const data = await res.json();
-      setTasks(data);
-    };
+    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
 
-    fetchTasks();
-  }, []);
-
-  // Helper: convert Mongo ObjectId to JS Date
-  const oidToDate = (id) => {
-    try {
-      return new Date(parseInt(id.substring(0, 8), 16) * 1000);
-    } catch (e) {
-      return new Date();
-    }
-  };
-
-  useEffect(() => {
-    const fetchDealsAndContacts = async () => {
+    const fetchAllData = async () => {
       try {
-        const [dealsRes, contactsRes] = await Promise.all([
-          fetch("http://localhost:5000/api/deals", { headers: getAuthHeaders() }),
-          fetch("http://localhost:5000/api/contacts", { headers: getAuthHeaders() }),
+        const [statsRes, tasksRes] = await Promise.all([
+          fetch("http://localhost:5000/api/dashboard/stats", { headers: getAuthHeaders() }),
+          fetch("http://localhost:5000/api/dashboard/tasks-preview", { headers: getAuthHeaders() })
         ]);
-
-        const dealsData = await dealsRes.json();
-        const contactsData = await contactsRes.json();
-
-        const dealsArray = Array.isArray(dealsData) ? dealsData : (dealsData?.data || []);
-        const contactsArray = Array.isArray(contactsData) ? contactsData : (contactsData?.data || []);
-
-        setDeals(dealsArray);
-        setContacts(contactsArray);
-
-        // Count won deals where stage equals "won" (case-insensitive to be robust)
-        setWonDealsCount((dealsArray || []).filter(d => (d.stage || "").toLowerCase() === "won").length);
-        setTotalContacts((contactsArray || []).length);
-
-        // Build recent activity list from deals' activity, contacts and tasks
-        const activityItems = [];
-
-        // Deal activities (they include timestamps)
-        (dealsArray || []).forEach(deal => {
-          (deal.activity || []).forEach(a => {
-            // ensure we have a timestamp for sorting
-            const ts = a.timestamp ? new Date(a.timestamp) : oidToDate(deal._id);
-            activityItems.push({
-              id: `${deal._id}-${ts.getTime()}`,
-              action: a.action,
-              timestamp: ts,
-              meta: deal.title || deal.company || deal._id,
-              type: 'deal',
-            });
-          });
-
-          // Also record creation of deal if not present in activity
-          if (!((deal.activity || []).some(a => a.action && a.action.includes('Deal Created')))) {
-            activityItems.push({
-              id: deal._id,
-              action: 'Deal Created',
-              timestamp: oidToDate(deal._id),
-              meta: deal.title || deal.company || deal._id,
-              type: 'deal',
-            });
-          }
-        });
-
-        // Contacts (treat as Contact Added). Use _id timestamp when available
-        (contactsArray || []).forEach(c => {
-          activityItems.push({
-            id: c._id,
-            action: 'Contact Added',
-            timestamp: oidToDate(c._id),
-            meta: c.name || c.email || c._id,
-            type: 'contact',
-          });
-        });
-
-        // Tasks (treat as Task Created) from tasks-preview
-        (tasks || []).forEach(t => {
-          activityItems.push({
-            id: t._id,
-            action: 'Task Created',
-            timestamp: t.createdAt ? new Date(t.createdAt) : oidToDate(t._id),
-            meta: t.text,
-            type: 'task',
-          });
-        });
-
-        // Sort by timestamp desc and limit
-        activityItems.sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-        setActivities(activityItems.slice(0, 8));
-
+        const statsData = await statsRes.json();
+        const tasksData = await tasksRes.json();
+        setStats(statsData);
+        setTasks(tasksData);
       } catch (err) {
-        console.error('Error fetching deals/contacts', err);
+        console.error("Error fetching dashboard data", err);
       }
     };
 
-    fetchDealsAndContacts();
-  }, [tasks]);
+    fetchAllData();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/dashboard/stats", { headers: getAuthHeaders() });
-        const data = await res.json();
-        setStats(data);
-      } catch (err) {
-        console.log("Error fetching stats", err);
-      }
+    socket.on("dashboardUpdated", () => {
+      fetchAllData();
+    });
+
+    socket.on("tasksUpdated", () => {
+      fetchAllData();
+    });
+
+    return () => {
+      socket.disconnect();
     };
-    fetchStats();
   }, []);
 
-  if (!stats) return <p className="text-white">Loading...</p>;
+  if (!stats) return <p className="text-white p-6">Loading...</p>;
 
   // 🔥 Month mapping (smooth charts)
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const revenueData = months.map((month, i) => {
-    const found = stats?.monthlyRevenue?.find(m => m._id === i + 1);
+    const found = stats?.monthlyRevenue?.find((m: any) => m._id === i + 1);
     return { name: month, revenue: found ? found.total : 0 };
   });
 
   const leadsData = months.map((month, i) => {
-    const found = stats?.monthlyLeads?.find(m => m._id === i + 1);
+    const found = stats?.monthlyLeads?.find((m: any) => m._id === i + 1);
     return { name: month, leads: found ? found.total : 0 };
   });
 
@@ -181,37 +93,37 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="h-40 lg:h-48 flex items-stretch w-full">
             <div className="w-full h-full p-2">
-              <KPICard icon={Users} title="Total Leads" value={`${stats.totalLeads}`} change="0" changeType="up" />
+              <KPICard icon={Users} title="Total Leads" value={`${stats.totalLeads}`} change={stats.leadsChange} changeType={stats.leadsChangeType} />
             </div>
           </div>
 
           <div className="h-40 lg:h-48 flex items-stretch w-full">
             <div className="w-full h-full p-2">
-              <KPICard icon={IndianRupee} title="Revenue" value={`₹${(stats.revenue / 100000).toFixed(1)}L`} change="0" changeType="up" />
+              <KPICard icon={IndianRupee} title="Revenue" value={`₹${(stats.revenue / 100000).toFixed(1)}L`} change={stats.revenueChange} changeType={stats.revenueChangeType} />
             </div>
           </div>
 
           <div className="h-40 lg:h-48 flex items-stretch w-full">
             <div className="w-full h-full p-2">
-              <KPICard icon={TrendingUp} title="Conversion Rate" value={`${stats.conversionRate}%`} change="0" changeType="up" />
+              <KPICard icon={TrendingUp} title="Conversion Rate" value={`${stats.conversionRate}%`} change={stats.conversionRateChange} changeType={stats.conversionRateChangeType} />
             </div>
           </div>
 
           <div className="h-40 lg:h-48 flex items-stretch w-full">
             <div className="w-full h-full p-2">
-              <KPICard icon={Handshake} title="Active Deals" value={`${stats.activeDeals}`} change="0" changeType="up" />
+              <KPICard icon={Handshake} title="Active Deals" value={`${stats.activeDeals}`} change={stats.activeDealsChange} changeType={stats.activeDealsChangeType} />
             </div>
           </div>
 
           <div className="h-40 lg:h-48 flex items-stretch w-full">
             <div className="w-full h-full p-2">
-              <KPICard icon={Sparkles} title="Won Deals" value={`${wonDealsCount}`} change="0" changeType="up" />
+              <KPICard icon={Sparkles} title="Won Deals" value={`${stats.wonDeals}`} change={stats.wonDealsChange} changeType={stats.wonDealsChangeType} />
             </div>
           </div>
 
           <div className="h-40 lg:h-48 flex items-stretch w-full">
             <div className="w-full h-full p-2">
-              <KPICard icon={Clock} title="Total Contacts" value={`${totalContacts}`} change="0" changeType="up" />
+              <KPICard icon={Clock} title="Total Contacts" value={`${stats.totalContacts}`} change={stats.contactsChange} changeType={stats.contactsChangeType} />
             </div>
           </div>
         </div>
@@ -292,17 +204,17 @@ const Dashboard = () => {
             <a href="/deals" className="text-primary text-xs">View All →</a>
           </div>
           <div className="space-y-3 overflow-y-auto max-h-[300px] pr-2">
-            {activities.length === 0 ? (
+            {!stats.activities || stats.activities.length === 0 ? (
               <div className="text-center py-4">
                 <p className="text-sm text-muted-foreground mb-2">No recent activity</p>
               </div>
             ) : (
-              activities.map((a, idx) => (
-                <div key={`${a.type}-${a.id}-${idx}`} className="py-2 border-b border-white/5 last:border-b-0">
+              stats.activities.map((a: any, idx: number) => (
+                <div key={`${a._id || idx}-${idx}`} className="py-2 border-b border-white/5 last:border-b-0">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-foreground">{a.action}{a.meta ? ` — ${a.meta}` : ''}</p>
-                      <p className="text-[11px] text-muted-foreground mt-1">{new Date(a.timestamp).toLocaleString()}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">{new Date(a.timestamp || a.createdAt).toLocaleString()}</p>
                     </div>
                   </div>
                 </div>

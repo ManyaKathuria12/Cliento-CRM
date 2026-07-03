@@ -12,10 +12,49 @@ router.get("/users", async (req, res) => {
   }
 });
 
+// UPDATE user role/status
+router.put("/users/:id", async (req, res) => {
+  try {
+    const { role, disabled } = req.body;
+    const updated = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: { role, disabled } },
+      { new: true }
+    ).select("-password");
+
+    if (!updated) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    try {
+      req.app.get("io")?.emit("dashboardUpdated");
+      req.app.get("io")?.emit("usersUpdated");
+    } catch (e) {
+      console.error("Failed to emit dashboardUpdated after user update", e);
+    }
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: "Error updating user" });
+  }
+});
+
 // DELETE user
 router.delete("/users/:id", async (req, res) => {
-  await User.findByIdAndDelete(req.params.id);
-  res.json({ message: "Deleted" });
+  try {
+    await User.findByIdAndDelete(req.params.id);
+
+    try {
+      req.app.get("io")?.emit("dashboardUpdated");
+      req.app.get("io")?.emit("usersUpdated");
+    } catch (e) {
+      console.error("Failed to emit dashboardUpdated after user delete", e);
+    }
+
+    res.json({ message: "Deleted" });
+  } catch (err) {
+    res.status(500).json({ message: "Error deleting user" });
+  }
 });
 
 module.exports = router;

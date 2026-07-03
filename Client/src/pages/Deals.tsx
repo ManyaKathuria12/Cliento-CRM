@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { 
   IndianRupee, Calendar, User, Search, Filter, ArrowUpDown, 
-  Trash2, Edit3, Eye, Plus, Building, Phone, ArrowUpRight, check
+  Trash2, Edit3, Eye, Plus, Building, Phone, ArrowUpRight
 } from "lucide-react";
 import { getAuthHeaders } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
+import { io } from "socket.io-client";
 
 interface Deal {
   id: string;
@@ -73,6 +74,16 @@ export default function Deals() {
   useEffect(() => {
     fetchDeals();
     fetchLeads();
+
+    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    socket.on("dashboardUpdated", () => {
+      fetchDeals();
+      fetchLeads();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const fetchDeals = async () => {
@@ -206,7 +217,7 @@ export default function Deals() {
   };
 
   // Stats calculations
-  const totalDeals = deals.length;
+  const totalDealValue = deals.reduce((sum, d) => sum + Number(d.value || 0), 0);
   const activeDeals = deals.filter(d => d.stage !== "won" && d.stage !== "lost").length;
   const wonDeals = deals.filter(d => d.stage === "won").length;
   const lostDeals = deals.filter(d => d.stage === "lost").length;
@@ -254,10 +265,10 @@ export default function Deals() {
 
       {/* STATISTICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Deals */}
+        {/* Total Deal Value */}
         <div className="glass p-5 rounded-2xl border border-border/50 space-y-1 relative overflow-hidden group hover:border-primary/30 transition-all">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Deals</p>
-          <p className="text-2xl font-extrabold text-foreground">{totalDeals}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Deal Value</p>
+          <p className="text-2xl font-extrabold text-foreground truncate">{formatValue(totalDealValue.toString())}</p>
         </div>
         {/* Active Deals */}
         <div className="glass p-5 rounded-2xl border border-border/50 space-y-1 relative overflow-hidden group hover:border-blue-500/30 transition-all">
@@ -276,7 +287,7 @@ export default function Deals() {
         </div>
         {/* Total Revenue */}
         <div className="glass p-5 rounded-2xl border border-border/50 space-y-1 relative overflow-hidden group hover:border-emerald-500/30 transition-all sm:col-span-2 lg:col-span-1">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Revenue</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revenue</p>
           <p className="text-2xl font-extrabold text-emerald-400 truncate">{formatValue(totalRevenue.toString())}</p>
         </div>
       </div>

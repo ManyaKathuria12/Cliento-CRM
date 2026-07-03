@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Task = require("../models/Task");
 const authMiddleware = require("../middleware/auth");
+const { notify } = require("../utils/notifier");
 
 router.use(authMiddleware);
 
@@ -51,6 +52,8 @@ router.post("/", async (req, res) => {
 
     req.app.get("io").emit("tasksUpdated");
     try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+
+    await notify(req.app, "Task Created 📋", `Task "${task.text}" was created.`, "task", "medium");
 
     res.json(task);
   } catch (err) {
@@ -139,6 +142,10 @@ router.put("/:id", async (req, res) => {
       .populate("relatedLead")
       .populate("relatedDeal");
 
+    if (isCompleted && populatedTask) {
+      await notify(req.app, "Task Completed ✅", `Task "${populatedTask.text}" was completed.`, "task", "medium");
+    }
+
     res.json(populatedTask);
   } catch (err) {
     console.log(err);
@@ -213,10 +220,14 @@ router.put("/:id/checklist/:itemId", async (req, res) => {
 // DELETE task
 router.delete("/:id", async (req, res) => {
   try {
-    await Task.findByIdAndDelete(req.params.id);
-    
-    req.app.get("io").emit("tasksUpdated");
-    try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+    const task = await Task.findById(req.params.id);
+    if (task) {
+      await Task.findByIdAndDelete(req.params.id);
+      
+      req.app.get("io").emit("tasksUpdated");
+      try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
+      await notify(req.app, "Task Deleted 🗑️", `Task "${task.text}" was deleted.`, "task", "low");
+    }
 
     res.json({ message: "Task deleted ✅" });
   } catch (err) {

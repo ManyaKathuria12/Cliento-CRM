@@ -1,13 +1,15 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, Contact, Handshake, CheckSquare,
-  BarChart3, Settings, Bell, MessageSquare, LogOut
+  BarChart3, Bell, MessageSquare, LogOut
 } from "lucide-react";
 import Logo from "./Logo";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
+import { io } from "socket.io-client";
+import { getAuthHeaders } from "@/utils/api";
 
 
 
@@ -44,148 +46,96 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const { user, logout } = useAuth();
   const [customToast, setCustomToast] = useState<string | null>(null);
-const [notifications, setNotifications] = useState<
-  { id: string; text: string; type: string }[]
->([]);
-const [readNotifications, setReadNotifications] = useState<string[]>(() => {
-  const saved = localStorage.getItem("readNotifications");
-  return saved ? JSON.parse(saved) : [];
-});
-const importantNotifications = notifications.filter(
-  (n) =>
-    n.type?.toLowerCase() !== "upcoming" &&
-    !readNotifications.includes(n.id)
-);
-const [lastToastId, setLastToastId] = useState<string | null>(null);
+  
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [lastNotificationId, setLastNotificationId] = useState<string | null>(null);
 
-
-const isOverdue = (date: string) => {
-  return new Date(date + "T00:00:00") < new Date();
-};
-
-const generateNotifications = (data: any) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const notes: { id: string; text: string; type: string }[] = [];
-
-  data.forEach((t: any) => {
-    if (t.done) return;
-
-    const due = new Date(t.due + "T00:00:00");
-
-    if (due < today) {
-      notes.push({
-        id: t._id,
-        text: `${t.text} is overdue`,
-        type: "overdue",
-      });
-    } else if (due.toDateString() === today.toDateString()) {
-      notes.push({
-        id: t._id,
-        text: `${t.text} is due today`,
-        type: "today",
-      });
-    } else {
-      notes.push({
-        id: t._id,
-        text: `${t.text} upcoming`,
-        type: "upcoming",
-      });
-    }
-  });
-
-  return notes;
-};
-
-useEffect(() => {
-  if (customToast) {
-    const timer = setTimeout(() => {
-      setCustomToast("");
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }
-}, [customToast]);
-
-useEffect(() => {
-  const handleClick = (e: any) => {
-    if (!e.target.closest(".notification-box")) {
-      setOpen(false);
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/notifications", { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setNotifications(data);
+      }
+    } catch (e) {
+      console.log("Error loading notifications in layout:", e);
     }
   };
 
-  document.addEventListener("click", handleClick);
-  return () => document.removeEventListener("click", handleClick);
-}, []);
+  useEffect(() => {
+    fetchNotifications();
 
-useEffect(() => {
-  const fetchTasks = async () => {
-    const res = await fetch("http://localhost:5000/api/tasks");
-    const data = await res.json();
+    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    
+    socket.on("dashboardUpdated", () => {
+      fetchNotifications();
+    });
 
-    const notes = generateNotifications(data);
+    socket.on("tasksUpdated", () => {
+      fetchNotifications();
+    });
 
-    setNotifications(notes);
-  };
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
-  fetchTasks();
-}, []); 
+  useEffect(() => {
+    const handleStorage = () => {
+      fetchNotifications();
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("localNotificationsUpdated", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("localNotificationsUpdated", handleStorage);
+    };
+  }, []);
 
+  // Display toast alerts for new unread notifications
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const latest = notifications[0];
+      const id = latest._id || latest.id;
+      if (lastNotificationId && id !== lastNotificationId && !latest.read) {
+        toast(`${latest.title}: ${latest.description}`, {
+          icon: '🔔',
+          duration: 4000
+        });
+      }
+      setLastNotificationId(id);
+    }
+  }, [notifications, lastNotificationId]);
 
+  const unreadNotes = notifications.filter((n: any) => !n.read);
+  const unreadCount = unreadNotes.length;
 
-useEffect(() => {
-  localStorage.setItem(
-    "readNotifications",
-    JSON.stringify(readNotifications)
-  );
-}, [readNotifications]);
+  const hasOverdue = unreadNotes.some((n: any) => n.title?.includes("Overdue"));
+  const hasHighPriority = unreadNotes.some((n: any) => n.priority === "high");
 
-useEffect(() => {
-  if (customToast) {
-    const timer = setTimeout(() => setCustomToast(null), 3000);
-    return () => clearTimeout(timer);
+  let badgeColor = "bg-green-500";
+  if (hasOverdue || hasHighPriority) {
+    badgeColor = "bg-red-500";
+  } else if (unreadCount > 0) {
+    badgeColor = "bg-yellow-400";
   }
-}, [customToast]);
-
-useEffect(() => {
-  setReadNotifications((prev) =>
-    prev.filter((id) =>
-      notifications.some((n) => n.id === id)
-    )
-  );
-}, [notifications]);
 
   const role = user?.role || "sales";
   const navItems = getNavItems(role);
 
-  const overdue = notifications.filter((n) => n.type === "overdue");
-const today = notifications.filter((n) => n.type === "today");
-const upcoming = notifications.filter((n) => n.type === "upcoming");
-const unreadCount = importantNotifications.length;
-
-const hasOverdue = importantNotifications.some(
-  (n) => n.type === "overdue"
-);
-
-const hasToday = importantNotifications.some(
-  (n) => n.type === "today"
-);
-
-let badgeColor = "bg-green-500";
-
-if (hasOverdue) {
-  badgeColor = "bg-red-500";
-} else if (hasToday) {
-  badgeColor = "bg-yellow-400";
-}
-
 
   // 🔥 LOGOUT
   const handleLogout = () => {
+    setShowUserMenu(false);
     setShowLogoutModal(true);
+  };
+
+  const handleProfileMenuAction = (path: string) => {
+    setShowUserMenu(false);
+    navigate(path);
   };
 
   const confirmLogout = () => {
@@ -199,37 +149,6 @@ if (hasOverdue) {
     user?.name?.charAt(0)?.toUpperCase() ||
     user?.email?.charAt(0)?.toUpperCase() ||
     "U";
-
-    const NotificationItem = ({ n }) => (
-  <div
-    key={n.id}
-    onClick={() => {
-      navigate("/tasks");
-      setReadNotifications((prev) =>
-        prev.includes(n.id) ? prev : [...prev, n.id]
-      );
-      setOpen(false);
-    }}
-   className={`text-xs p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-  readNotifications.includes(n.id)
-    ? "opacity-40"
-    : "bg-muted/30 hover:bg-muted/60 hover:scale-[1.02]"
-}`}
-  >
-    <div className="flex items-center gap-2">
-  <span
-    className={`w-2 h-2 rounded-full ${
-      n.type === "overdue"
-        ? "bg-red-400"
-        : n.type === "today"
-        ? "bg-yellow-400"
-        : "bg-green-400"
-    }`}
-  />
-  <span className="truncate">{n.text}</span>
-</div>
-  </div>
-);
 
   return (
     <div className="min-h-screen bg-background">
@@ -286,30 +205,52 @@ if (hasOverdue) {
 </div>
 
           {/* 👤 USER NAME */}
-<div
- 
-  onClick={() => navigate("/profile")}
-  className="flex items-center gap-2 cursor-pointer"
->
-  <span
-  className={`text-sm font-medium hidden sm:block transition-all duration-200 ${
-    location.pathname === "/profile"
-      ? "text-primary"
-      : "text-muted-foreground hover:text-primary"
-  }`}
->
-    {user?.name || "User"}
-  </span>
+<div className="relative">
+  <button
+    type="button"
+    onClick={() => setShowUserMenu((prev) => !prev)}
+    className="flex items-center gap-2 cursor-pointer"
+  >
+    <span
+      className={`text-sm font-medium hidden sm:block transition-all duration-200 ${
+        showUserMenu || location.pathname === "/profile"
+          ? "text-primary"
+          : "text-muted-foreground hover:text-primary"
+      }`}
+    >
+      {user?.name || "User"}
+    </span>
 
-  {user?.avatar ? (
-    <img
-      src={`http://localhost:5000/uploads/${user.avatar}`}
-      className="w-9 h-9 rounded-xl object-cover"
-    />
-  ) : (
-   <div className="w-9 h-9 rounded-full bg-gradient-to-r from-teal-400 to-cyan-500 flex items-center justify-center text-black font-bold">
-  {initials}
-</div>
+    {user?.avatar ? (
+      <img
+        src={`http://localhost:5000/uploads/${user.avatar}`}
+        alt={`${user?.name || "User"} avatar`}
+        className="w-9 h-9 rounded-xl object-cover"
+      />
+    ) : (
+      <div className="w-9 h-9 rounded-full bg-gradient-to-r from-teal-400 to-cyan-500 flex items-center justify-center text-black font-bold">
+        {initials}
+      </div>
+    )}
+  </button>
+
+  {showUserMenu && (
+    <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-border bg-card shadow-lg py-2 z-50">
+      <button
+        type="button"
+        onClick={() => handleProfileMenuAction("/settings")}
+        className="flex w-full items-center px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+      >
+        Settings
+      </button>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="flex w-full items-center px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+      >
+        Logout
+      </button>
+    </div>
   )}
 </div>
 

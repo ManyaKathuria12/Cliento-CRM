@@ -7,6 +7,7 @@ const Contact = require("../models/Contact");
 const Task = require("../models/Task");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { notify } = require("../utils/notifier");
 
 
 // =======================
@@ -104,7 +105,7 @@ if (!isMatch) {
 
     // 🎫 TOKEN
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role, tokenVersion: user.tokenVersion || 0 },
       "secret123",
       { expiresIn: "7d" }
     );
@@ -267,7 +268,12 @@ router.get("/profile-activity/:id", async (req, res) => {
 router.put("/profile/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, company, jobTitle, location, avatar } = req.body;
+    const {
+      name, email, phone, company, jobTitle, location, avatar, bio,
+      companyWebsite, companyIndustry, companyLogo,
+      leadNotifications, dealNotifications, taskReminders,
+      emailNotifications, browserNotifications, theme
+    } = req.body;
 
     // Optional: check email usage
     if (email) {
@@ -288,10 +294,24 @@ router.put("/profile/:id", async (req, res) => {
           jobTitle,
           location,
           avatar,
+          bio,
+          companyWebsite,
+          companyIndustry,
+          companyLogo,
+          leadNotifications,
+          dealNotifications,
+          taskReminders,
+          emailNotifications,
+          browserNotifications,
+          theme
         },
       },
       { new: true }
     ).select("-password");
+
+    if (updatedUser) {
+      await notify(req.app, "Profile Updated ⚙️", `User profile for "${updatedUser.name}" was updated.`, "system", "low");
+    }
 
     res.json(updatedUser);
   } catch (err) {
@@ -336,6 +356,8 @@ router.put("/change-password/:id", async (req, res) => {
     user.password = hashed;
     await user.save();
 
+    await notify(req.app, "Password Changed 🔒", `Password for user "${user.name}" was changed.`, "system", "medium");
+
     res.json({ message: "Password updated successfully ✅" });
   } catch (err) {
     console.log("CHANGE PASSWORD ERROR:", err);
@@ -371,7 +393,7 @@ router.post("/google", async (req, res) => {
 
     // 🎫 TOKEN (optional but best)
     const token = jwt.sign(
-      { id: user._id },
+      { id: user._id, role: user.role, tokenVersion: user.tokenVersion || 0 },
       "secret123",
       { expiresIn: "7d" }
     );
@@ -395,6 +417,39 @@ router.post("/google", async (req, res) => {
   } catch (err) {
     console.log("GOOGLE LOGIN ERROR:", err);
     res.status(500).json({ message: "Google login failed ❌" });
+  }
+});
+
+// 🔥 LOGOUT ALL DEVICES
+router.post("/logout-all/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found ❌" });
+    }
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+    res.json({ message: "Logged out from all devices successfully ✅" });
+  } catch (err) {
+    console.log("LOGOUT ALL DEVICES ERROR:", err);
+    res.status(500).json({ message: "Logout failed ❌" });
+  }
+});
+
+// 🔥 DELETE ACCOUNT
+router.delete("/delete-account/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found ❌" });
+    }
+    await User.findByIdAndDelete(id);
+    res.json({ message: "Account deleted successfully ✅" });
+  } catch (err) {
+    console.log("DELETE ACCOUNT ERROR:", err);
+    res.status(500).json({ message: "Deletion failed ❌" });
   }
 });
 

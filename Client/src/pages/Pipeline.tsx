@@ -4,6 +4,7 @@ import { IndianRupee, Calendar, User, Search, Building, Clock } from "lucide-rea
 import { getAuthHeaders, authFetch } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
+import { io } from "socket.io-client";
 
 interface Deal {
   id: string;
@@ -96,6 +97,15 @@ export default function Pipeline() {
 
   useEffect(() => {
     fetchDeals();
+
+    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    socket.on("dashboardUpdated", () => {
+      fetchDeals();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const onDragEnd = async (result: DropResult) => {

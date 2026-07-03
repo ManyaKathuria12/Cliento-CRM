@@ -1,95 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { 
   Users, Handshake, CheckSquare, Contact, Zap, 
   Trash2, Check, CheckCheck, Bell, BellOff, AlertTriangle, Clock 
 } from "lucide-react";
 import KPICard from "@/components/KPICard";
 import { motion, AnimatePresence } from "framer-motion";
+import { io } from "socket.io-client";
+import { getAuthHeaders } from "@/utils/api";
 
 interface Notification {
-  id: string;
+  _id?: string;
+  id?: string;
   title: string;
   description: string;
-  timestamp: string;
+  timestamp?: string;
+  createdAt?: string;
   category: "lead" | "deal" | "task" | "contact" | "system";
   read: boolean;
   priority: "low" | "medium" | "high";
 }
-
-const mockNotifications: Notification[] = [
-  {
-    id: "n1",
-    title: "New Lead Created",
-    description: 'A new hot lead "Rajesh Kumar" was generated from the Website contact form.',
-    timestamp: "10 mins ago",
-    category: "lead",
-    read: false,
-    priority: "medium",
-  },
-  {
-    id: "n2",
-    title: "Deal Moved to Won 🎉",
-    description: 'The deal "Enterprise Software License" with Acme Corp has been closed won (₹15,00,000).',
-    timestamp: "2 hours ago",
-    category: "deal",
-    read: false,
-    priority: "high",
-  },
-  {
-    id: "n3",
-    title: "Task Due Today ⏰",
-    description: "Follow up call with Priya Sharma is scheduled for today by 5:00 PM.",
-    timestamp: "4 hours ago",
-    category: "task",
-    read: false,
-    priority: "high",
-  },
-  {
-    id: "n4",
-    title: "Contact Updated",
-    description: "Amit Patel's primary phone number and email address were updated.",
-    timestamp: "Yesterday",
-    category: "contact",
-    read: true,
-    priority: "low",
-  },
-  {
-    id: "n5",
-    title: "Revenue Milestone Reached",
-    description: "Congratulations! Monthly recurring revenue has surpassed the target milestone of ₹20,00,000.",
-    timestamp: "Yesterday",
-    category: "system",
-    read: true,
-    priority: "high",
-  },
-  {
-    id: "n6",
-    title: "Hot Lead Scoring Alert",
-    description: 'Lead "Vikram Singh" has reached a hot scoring threshold of 85 points.',
-    timestamp: "2 days ago",
-    category: "lead",
-    read: true,
-    priority: "medium",
-  },
-  {
-    id: "n7",
-    title: "Deal Value Updated",
-    description: 'Deal "Cloud Migration" estimated value has been updated to ₹8,00,000.',
-    timestamp: "3 days ago",
-    category: "deal",
-    read: true,
-    priority: "medium",
-  },
-  {
-    id: "n8",
-    title: "New Task Assigned",
-    description: "You have been assigned a new task: Review contract drafts for Malhotra Group.",
-    timestamp: "4 days ago",
-    category: "task",
-    read: true,
-    priority: "low",
-  },
-];
 
 const categoryConfig = {
   lead: {
@@ -119,37 +48,125 @@ const categoryConfig = {
   },
 };
 
+const formatTimestamp = (dateStr?: string) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+  return date.toLocaleDateString();
+};
+
 const Notifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<string>("all");
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/notifications", {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+
+    const socket = io("http://localhost:5000", {
+      transports: ["websocket"],
+      withCredentials: true,
+    });
+
+    socket.on("dashboardUpdated", () => {
+      fetchNotifications();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const totalCount = notifications.length;
   const unreadCount = notifications.filter((n) => !n.read).length;
   const readCount = notifications.filter((n) => n.read).length;
   const highPriorityCount = notifications.filter((n) => n.priority === "high").length;
 
-  const handleMarkAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  const handleToggleRead = async (id: string) => {
+    const note = notifications.find((n) => (n._id || n.id) === id);
+    if (!note) return;
+    try {
+      await fetch(`http://localhost:5000/api/notifications/${id}`, {
+        method: "PUT",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ read: !note.read }),
+      });
+      setNotifications((prev) =>
+        prev.map((n) => ((n._id || n.id) === id ? { ...n, read: !note.read } : n))
+      );
+      // Trigger a local storage custom event to sync layout badge
+      window.dispatchEvent(new Event("localNotificationsUpdated"));
+    } catch (err) {
+      console.error("Error toggling read status:", err);
+    }
   };
 
-  const handleToggleRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n))
-    );
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`http://localhost:5000/api/notifications/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setNotifications((prev) => prev.filter((n) => (n._id || n.id) !== id));
+      // Trigger a local storage custom event to sync layout badge
+      window.dispatchEvent(new Event("localNotificationsUpdated"));
+    } catch (err) {
+      console.error("Error deleting notification:", err);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  const handleMarkAllAsRead = async () => {
+    try {
+      await fetch("http://localhost:5000/api/notifications/mark-all-read", {
+        method: "PUT",
+        headers: getAuthHeaders(),
+      });
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      // Trigger a local storage custom event to sync layout badge
+      window.dispatchEvent(new Event("localNotificationsUpdated"));
+    } catch (err) {
+      console.error("Error marking all as read:", err);
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const handleDeleteAll = () => {
-    setNotifications([]);
+  const handleDeleteAll = async () => {
+    try {
+      await fetch("http://localhost:5000/api/notifications/clear-all", {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setNotifications([]);
+      // Trigger a local storage custom event to sync layout badge
+      window.dispatchEvent(new Event("localNotificationsUpdated"));
+    } catch (err) {
+      console.error("Error clearing notifications:", err);
+    }
   };
 
   const filteredNotifications = notifications.filter((n) => {
@@ -295,17 +312,18 @@ const Notifications = () => {
               {filteredNotifications.map((n) => {
                 const config = categoryConfig[n.category] || categoryConfig.system;
                 const CategoryIcon = config.icon;
+                const currentId = n._id || n.id || "";
 
                 return (
                   <motion.div
-                    key={n.id}
+                    key={currentId}
                     layout
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.2 }}
                     className={`flex items-start justify-between gap-4 p-4 rounded-xl border bg-secondary/20 border-border/50 hover:bg-secondary/35 transition-all duration-300 ${
-                      n.id !== filteredNotifications[0].id ? "mt-4" : ""
+                      currentId !== (filteredNotifications[0]._id || filteredNotifications[0].id) ? "mt-4" : ""
                     }`}
                   >
                     {/* LEFT SIDE: ICON & INFO */}
@@ -357,7 +375,7 @@ const Notifications = () => {
                           {/* Time */}
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Clock size={12} />
-                            <span>{n.timestamp}</span>
+                            <span>{formatTimestamp(n.createdAt || n.timestamp)}</span>
                           </div>
                         </div>
                       </div>
@@ -366,7 +384,7 @@ const Notifications = () => {
                     {/* RIGHT SIDE: CARD ACTIONS */}
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleToggleRead(n.id)}
+                        onClick={() => handleToggleRead(currentId)}
                         className={`p-2 rounded-lg transition-all cursor-pointer ${
                           !n.read
                             ? "text-primary hover:bg-primary/10"
@@ -377,7 +395,7 @@ const Notifications = () => {
                         <Check size={16} />
                       </button>
                       <button
-                        onClick={() => handleDelete(n.id)}
+                        onClick={() => handleDelete(currentId)}
                         className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
                         title="Delete notification"
                       >
