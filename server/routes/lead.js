@@ -10,7 +10,8 @@ router.use(authMiddleware);
 // GET ALL LEADS
 router.get("/", async (req, res) => {
   try {
-    const leads = await Lead.find().sort({ _id: -1 });
+    const query = req.user.role === "admin" ? {} : { createdBy: req.user.id };
+    const leads = await Lead.find(query).sort({ _id: -1 });
     res.json(leads);
   } catch (err) {
     console.log(err);
@@ -27,6 +28,10 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({
         error: "Lead not found ❌",
       });
+    }
+
+    if (req.user.role !== "admin" && String(lead.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
     }
 
     const deal = await Deal.findOne({ leadId: lead._id });
@@ -51,6 +56,7 @@ router.post("/", async (req, res) => {
     console.log("BODY:", req.body);
     const leadData = {
       ...req.body,
+      createdBy: req.user.id,
       activity: [
         {
           action: "Created",
@@ -65,7 +71,7 @@ router.post("/", async (req, res) => {
     // notify sockets
     try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
-    await notify(req.app, "Lead Created 👤", `Lead "${lead.name}" representing "${lead.company || 'Individual'}" was created.`, "lead", "medium");
+    await notify(req.app, "Lead Created 👤", `Lead "${lead.name}" representing "${lead.company || 'Individual'}" was created.`, "lead", "medium", req.user.id);
 
     res.json(lead);
   } catch (err) {
@@ -79,9 +85,12 @@ router.delete("/:id", async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id);
     if (lead) {
+      if (req.user.role !== "admin" && String(lead.createdBy) !== req.user.id) {
+        return res.status(403).json({ error: "Access denied ❌" });
+      }
       await Lead.findByIdAndDelete(req.params.id);
       try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
-      await notify(req.app, "Lead Deleted 🗑️", `Lead "${lead.name}" was deleted.`, "lead", "low");
+      await notify(req.app, "Lead Deleted 🗑️", `Lead "${lead.name}" was deleted.`, "lead", "low", req.user.id);
     }
     res.json({ message: "Deleted ✅" });
   } catch (err) {
@@ -97,6 +106,10 @@ router.put("/:id", async (req, res) => {
     const lead = await Lead.findById(req.params.id);
     if (!lead) {
       return res.status(404).json({ error: "Lead not found ❌" });
+    }
+
+    if (req.user.role !== "admin" && String(lead.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
     }
 
     let isStatusChanged = false;
@@ -135,7 +148,7 @@ router.put("/:id", async (req, res) => {
 
     try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
-    await notify(req.app, "Lead Updated 👤", `Lead "${lead.name}" was updated.`, "lead", "low");
+    await notify(req.app, "Lead Updated 👤", `Lead "${lead.name}" was updated.`, "lead", "low", req.user.id);
     
     // Perform linked deal check to return same shape as GET /:id
     const deal = await Deal.findOne({ leadId: lead._id });
@@ -160,6 +173,10 @@ router.post("/:id/notes", async (req, res) => {
     const { text } = req.body;
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+    if (req.user.role !== "admin" && String(lead.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
     
     lead.notesList.push({ text, date: new Date() });
     await lead.save();
@@ -179,6 +196,10 @@ router.post("/:id/followups", async (req, res) => {
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ error: "Lead not found" });
 
+    if (req.user.role !== "admin" && String(lead.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
+
     lead.followups.push({ text, method, date: new Date() });
     await lead.save();
 
@@ -197,6 +218,10 @@ router.post("/:id/tasks", async (req, res) => {
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ error: "Lead not found" });
 
+    if (req.user.role !== "admin" && String(lead.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
+
     lead.upcomingTasks.push({ text, due, done: false });
     await lead.save();
 
@@ -214,6 +239,10 @@ router.put("/:id/tasks/:taskId", async (req, res) => {
     const { done } = req.body;
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+    if (req.user.role !== "admin" && String(lead.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
 
     const task = lead.upcomingTasks.id(req.params.taskId);
     if (!task) return res.status(404).json({ error: "Task not found" });

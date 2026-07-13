@@ -1,13 +1,21 @@
 const Notification = require("../models/Notification");
+const User = require("../models/User");
 
-async function notify(app, title, description, category, priority = "medium") {
+async function notify(app, title, description, category, priority = "medium", createdBy = null) {
   try {
+    let creator = createdBy;
+    if (!creator) {
+      const admin = await User.findOne({ role: "admin" });
+      if (admin) creator = admin._id;
+    }
+
     const notification = await Notification.create({
       title,
       description,
       category,
       priority,
       read: false,
+      createdBy: creator,
     });
 
     try {

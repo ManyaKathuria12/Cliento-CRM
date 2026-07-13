@@ -9,7 +9,8 @@ router.use(authMiddleware);
 // GET all tasks
 router.get("/", async (req, res) => {
   try {
-    const tasks = await Task.find()
+    const query = req.user.role === "admin" ? {} : { createdBy: req.user.id };
+    const tasks = await Task.find(query)
       .populate("relatedLead")
       .populate("relatedDeal")
       .sort({ _id: -1 });
@@ -29,6 +30,11 @@ router.get("/:id", async (req, res) => {
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
     }
+
+    if (req.user.role !== "admin" && String(task.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
+
     res.json(task);
   } catch (err) {
     console.log(err);
@@ -41,6 +47,7 @@ router.post("/", async (req, res) => {
   try {
     const taskData = {
       ...req.body,
+      createdBy: req.user.id,
       activity: [
         {
           action: "Task Created",
@@ -53,7 +60,7 @@ router.post("/", async (req, res) => {
     req.app.get("io").emit("tasksUpdated");
     try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
 
-    await notify(req.app, "Task Created 📋", `Task "${task.text}" was created.`, "task", "medium");
+    await notify(req.app, "Task Created 📋", `Task "${task.text}" was created.`, "task", "medium", req.user.id);
 
     res.json(task);
   } catch (err) {
@@ -69,6 +76,10 @@ router.put("/:id", async (req, res) => {
 
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
+    }
+
+    if (req.user.role !== "admin" && String(task.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
     }
 
     const oldDone = task.done;
@@ -143,7 +154,7 @@ router.put("/:id", async (req, res) => {
       .populate("relatedDeal");
 
     if (isCompleted && populatedTask) {
-      await notify(req.app, "Task Completed ✅", `Task "${populatedTask.text}" was completed.`, "task", "medium");
+      await notify(req.app, "Task Completed ✅", `Task "${populatedTask.text}" was completed.`, "task", "medium", req.user.id);
     }
 
     res.json(populatedTask);
@@ -159,6 +170,10 @@ router.post("/:id/notes", async (req, res) => {
     const { text } = req.body;
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
+
+    if (req.user.role !== "admin" && String(task.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
 
     const author = req.user ? req.user.name : "System User";
     task.notes.push({ text, date: new Date(), author });
@@ -181,6 +196,10 @@ router.post("/:id/checklist", async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
 
+    if (req.user.role !== "admin" && String(task.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
+
     task.checklist.push({ text, done: false });
     await task.save();
 
@@ -200,6 +219,10 @@ router.put("/:id/checklist/:itemId", async (req, res) => {
     const { done } = req.body;
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
+
+    if (req.user.role !== "admin" && String(task.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
 
     const item = task.checklist.id(req.params.itemId);
     if (!item) return res.status(404).json({ error: "Checklist item not found" });
@@ -222,11 +245,14 @@ router.delete("/:id", async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
     if (task) {
+      if (req.user.role !== "admin" && String(task.createdBy) !== req.user.id) {
+        return res.status(403).json({ error: "Access denied ❌" });
+      }
       await Task.findByIdAndDelete(req.params.id);
       
       req.app.get("io").emit("tasksUpdated");
       try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
-      await notify(req.app, "Task Deleted 🗑️", `Task "${task.text}" was deleted.`, "task", "low");
+      await notify(req.app, "Task Deleted 🗑️", `Task "${task.text}" was deleted.`, "task", "low", req.user.id);
     }
 
     res.json({ message: "Task deleted ✅" });

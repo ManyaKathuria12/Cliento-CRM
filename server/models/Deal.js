@@ -1,6 +1,11 @@
 const mongoose = require("mongoose"); // 🔥 ADD THIS
 
 const dealSchema = new mongoose.Schema({
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
   title: String,
   company: String,
   value: String,

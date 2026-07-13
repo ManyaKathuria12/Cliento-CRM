@@ -1,9 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
+const authMiddleware = require("../middleware/auth");
 
-// GET users
-router.get("/users", async (req, res) => {
+const adminOnly = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Access denied: Admin role required ❌" });
+  }
+  next();
+};
+
+// GET users (accessible to authenticated users for assigning tasks, etc.)
+router.get("/users", authMiddleware, async (req, res) => {
   try {
     const users = await User.find().select("-password"); // 👈 password hide
     res.json(users);
@@ -12,8 +20,8 @@ router.get("/users", async (req, res) => {
   }
 });
 
-// UPDATE user role/status
-router.put("/users/:id", async (req, res) => {
+// UPDATE user role/status (admin-only)
+router.put("/users/:id", authMiddleware, adminOnly, async (req, res) => {
   try {
     const { role, disabled } = req.body;
     const updated = await User.findByIdAndUpdate(
@@ -39,8 +47,8 @@ router.put("/users/:id", async (req, res) => {
   }
 });
 
-// DELETE user
-router.delete("/users/:id", async (req, res) => {
+// DELETE user (admin-only)
+router.delete("/users/:id", authMiddleware, adminOnly, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.params.id);
 

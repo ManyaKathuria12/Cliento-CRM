@@ -106,7 +106,7 @@ if (!isMatch) {
     // 🎫 TOKEN
     const token = jwt.sign(
       { id: user._id, role: user.role, tokenVersion: user.tokenVersion || 0 },
-      "secret123",
+      process.env.JWT_SECRET || "secret123",
       { expiresIn: "7d" }
     );
 
@@ -195,8 +195,10 @@ router.get("/profile-activity/:id", async (req, res) => {
     const userName = user.name || "";
     const activities = [];
 
+    const filter = user.role === "admin" ? {} : { createdBy: user._id };
+
     // 1. Fetch latest leads (limit 3)
-    const latestLeads = await Lead.find().sort({ createdAt: -1 }).limit(3);
+    const latestLeads = await Lead.find(filter).sort({ createdAt: -1 }).limit(3);
     latestLeads.forEach(lead => {
       activities.push({
         id: `lead-${lead._id}`,
@@ -209,7 +211,7 @@ router.get("/profile-activity/:id", async (req, res) => {
     });
 
     // 2. Fetch latest deal activities (limit 3 deals, process their activities)
-    const latestDeals = await Deal.find().sort({ updatedAt: -1 }).limit(3);
+    const latestDeals = await Deal.find(filter).sort({ updatedAt: -1 }).limit(3);
     latestDeals.forEach(deal => {
       if (deal.activity && deal.activity.length > 0) {
         const latestAct = deal.activity[deal.activity.length - 1];
@@ -226,6 +228,7 @@ router.get("/profile-activity/:id", async (req, res) => {
 
     // 3. Fetch completed tasks for this user (limit 3)
     const completedTasks = await Task.find({
+      ...filter,
       assignee: userName,
       $or: [{ done: true }, { status: "done" }]
     }).limit(3);
@@ -241,7 +244,7 @@ router.get("/profile-activity/:id", async (req, res) => {
     });
 
     // 4. Fetch latest contacts (limit 3)
-    const latestContacts = await Contact.find().sort({ _id: -1 }).limit(3);
+    const latestContacts = await Contact.find(filter).sort({ _id: -1 }).limit(3);
     latestContacts.forEach((contact, idx) => {
       activities.push({
         id: `contact-${contact._id || idx}`,
@@ -394,7 +397,7 @@ router.post("/google", async (req, res) => {
     // 🎫 TOKEN (optional but best)
     const token = jwt.sign(
       { id: user._id, role: user.role, tokenVersion: user.tokenVersion || 0 },
-      "secret123",
+      process.env.JWT_SECRET || "secret123",
       { expiresIn: "7d" }
     );
 

@@ -11,7 +11,8 @@ const { notify } = require("../utils/notifier");
 router.use(authMiddleware);
 
 router.get("/", async (req, res) => {
-  const deals = await Deal.find().populate("leadId");
+  const query = req.user.role === "admin" ? {} : { createdBy: req.user.id };
+  const deals = await Deal.find(query).populate("leadId");
   res.json(deals);
 });
 
@@ -30,6 +31,7 @@ router.post("/", async (req, res) => {
     // ✅ create deal with activity
     const dealData = {
       ...req.body,
+      createdBy: req.user.id,
       activity: [
         {
           action: "Deal Created",
@@ -56,17 +58,19 @@ router.post("/", async (req, res) => {
       await Activity.create({
         action: "Lead Converted",
         meta: leadObj ? leadObj.name : "Unknown Lead",
-        type: "lead"
+        type: "lead",
+        createdBy: req.user.id
       });
 
       await Activity.create({
         action: "Deal Created",
         meta: deal.title || "Untitled Deal",
-        type: "deal"
+        type: "deal",
+        createdBy: req.user.id
       });
 
-      await notify(req.app, "Lead Converted 🔄", `Lead "${leadObj ? leadObj.name : "Unknown"}" was converted.`, "lead", "medium");
-      await notify(req.app, "Deal Created 💼", `Deal "${deal.title}" was created.`, "deal", "medium");
+      await notify(req.app, "Lead Converted 🔄", `Lead "${leadObj ? leadObj.name : "Unknown"}" was converted.`, "lead", "medium", req.user.id);
+      await notify(req.app, "Deal Created 💼", `Deal "${deal.title}" was created.`, "deal", "medium", req.user.id);
     } catch (err) {
       console.log("Error logging deal conversion activities:", err);
     }
@@ -87,6 +91,14 @@ router.put("/:id", async (req, res) => {
 
     // Get current deal to track changes
     const currentDeal = await Deal.findById(dealId);
+    if (!currentDeal) {
+      return res.status(404).json({ error: "Deal not found ❌" });
+    }
+
+    if (req.user.role !== "admin" && String(currentDeal.createdBy) !== req.user.id) {
+      return res.status(403).json({ error: "Access denied ❌" });
+    }
+
     const activity = [...(currentDeal?.activity || [])];
 
     let isWon = false;
@@ -124,10 +136,11 @@ router.put("/:id", async (req, res) => {
         await Activity.create({
           action: "Deal Won 🎉",
           meta: `${updated.title} (Value: ₹${Number(updated.value || 0).toLocaleString("en-IN")})`,
-          type: "deal"
+          type: "deal",
+          createdBy: req.user.id
         });
 
-        await notify(req.app, "Deal Won 🎉", `Deal "${updated.title}" moved to Won.`, "deal", "high");
+        await notify(req.app, "Deal Won 🎉", `Deal "${updated.title}" moved to Won.`, "deal", "high", req.user.id);
       } catch (err) {
         console.log("Error logging won deal activities:", err);
       }
@@ -139,10 +152,11 @@ router.put("/:id", async (req, res) => {
         await Activity.create({
           action: "Deal Lost ❌",
           meta: `${updated.title}`,
-          type: "deal"
+          type: "deal",
+          createdBy: req.user.id
         });
 
-        await notify(req.app, "Deal Lost ❌", `Deal "${updated.title}" moved to Lost.`, "deal", "high");
+        await notify(req.app, "Deal Lost ❌", `Deal "${updated.title}" moved to Lost.`, "deal", "high", req.user.id);
       } catch (err) {
         console.log("Error logging lost deal activities:", err);
       }
@@ -161,9 +175,12 @@ router.delete("/:id", async (req, res) => {
   try {
     const deal = await Deal.findById(req.params.id);
     if (deal) {
+      if (req.user.role !== "admin" && String(deal.createdBy) !== req.user.id) {
+        return res.status(403).json({ error: "Access denied ❌" });
+      }
       await Deal.findByIdAndDelete(req.params.id);
       try { req.app.get("io").emit("dashboardUpdated"); } catch (e) {}
-      await notify(req.app, "Deal Deleted 🗑️", `Deal "${deal.title}" was deleted.`, "deal", "low");
+      await notify(req.app, "Deal Deleted 🗑️", `Deal "${deal.title}" was deleted.`, "deal", "low", req.user.id);
     }
     res.json({ message: "Deal deleted successfully" });
   } catch (err) {

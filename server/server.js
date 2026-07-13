@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
@@ -41,9 +42,70 @@ io.on("connection", (socket) => {
 
 app.set("io", io);
 
+const migrateDatabase = async () => {
+  try {
+    const Lead = require("./models/Lead");
+    const Contact = require("./models/Contact");
+    const Deal = require("./models/Deal");
+    const Task = require("./models/Task");
+    const Notification = require("./models/Notification");
+    const Activity = require("./models/Activity");
+
+    // Target user is the original sales demo account (Manya Kathuria)
+    const targetUserId = "69ef9f0044d8abb2c360b923";
+    const user = await User.findById(targetUserId);
+    if (!user) {
+      console.log("⚠️ Original demo user (Manya Kathuria) not found in database.");
+      return;
+    }
+
+    // Migrate Leads
+    const leadsResult = await Lead.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
+    if (leadsResult.modifiedCount > 0) {
+      console.log(`✅ Migrated ${leadsResult.modifiedCount} Leads to Original User ${user.email}`);
+    }
+
+    // Migrate Contacts
+    const contactsResult = await Contact.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
+    if (contactsResult.modifiedCount > 0) {
+      console.log(`✅ Migrated ${contactsResult.modifiedCount} Contacts to Original User ${user.email}`);
+    }
+
+    // Migrate Deals
+    const dealsResult = await Deal.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
+    if (dealsResult.modifiedCount > 0) {
+      console.log(`✅ Migrated ${dealsResult.modifiedCount} Deals to Original User ${user.email}`);
+    }
+
+    // Migrate Tasks
+    const tasksResult = await Task.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
+    if (tasksResult.modifiedCount > 0) {
+      console.log(`✅ Migrated ${tasksResult.modifiedCount} Tasks to Original User ${user.email}`);
+    }
+
+    // Migrate Notifications
+    const notificationsResult = await Notification.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
+    if (notificationsResult.modifiedCount > 0) {
+      console.log(`✅ Migrated ${notificationsResult.modifiedCount} Notifications to Original User ${user.email}`);
+    }
+
+    // Migrate Activities
+    const activitiesResult = await Activity.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
+    if (activitiesResult.modifiedCount > 0) {
+      console.log(`✅ Migrated ${activitiesResult.modifiedCount} Activities to Original User ${user.email}`);
+    }
+
+  } catch (err) {
+    console.error("❌ Database migration failed:", err);
+  }
+};
+
 // 🔥 MONGODB CONNECT
-mongoose.connect("mongodb://127.0.0.1:27017/cliento")
-  .then(() => console.log("MongoDB connected 🔥"))
+mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/cliento")
+  .then(async () => {
+    console.log("MongoDB connected 🔥");
+    await migrateDatabase();
+  })
   .catch(err => console.log(err));
 
 // 🔥 MIDDLEWARE
@@ -83,8 +145,8 @@ app.post("/upload", upload.single("avatar"), (req, res) => {
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "manyakathuria12@gmail.com",
-    pass: "onqo jbnr cifo qyjb", // app password
+    user: process.env.GMAIL_USER || "manyakathuria12@gmail.com",
+    pass: process.env.GMAIL_PASS || "onqo jbnr cifo qyjb", // app password
   },
 });
 
@@ -94,11 +156,11 @@ const transporter = nodemailer.createTransport({
 app.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
 
-  const resetLink = `http://localhost:8080/reset-password`;
+  const resetLink = `${process.env.FRONTEND_URL || "http://localhost:8080"}/reset-password`;
 
   try {
     await transporter.sendMail({
-      from: "manyakathuria12@gmail.com",
+      from: process.env.GMAIL_USER || "manyakathuria12@gmail.com",
       to: email,
       subject: "Password Reset",
       html: `
@@ -123,6 +185,7 @@ app.get("/", (req, res) => {
 });
 
 // 🚀 START SERVER
-server.listen(5000, () => {
-  console.log("Server running on http://localhost:5000");
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

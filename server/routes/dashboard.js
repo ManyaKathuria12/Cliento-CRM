@@ -13,15 +13,17 @@ router.use(authMiddleware);
 
 router.get("/stats", async (req, res) => {
   try {
-    const totalLeads = await Lead.countDocuments();
-    const totalDeals = await Deal.countDocuments();
-    const totalContacts = await Contact.countDocuments();
-    const totalTasks = await Task.countDocuments();
+    const filter = req.user.role === "admin" ? {} : { createdBy: req.user.id };
 
-    const completedTasks = await Task.countDocuments({ $or: [{ done: true }, { status: "done" }] });
-    const pendingTasks = await Task.countDocuments({ status: { $in: ["todo", "progress"] } });
+    const totalLeads = await Lead.countDocuments(filter);
+    const totalDeals = await Deal.countDocuments(filter);
+    const totalContacts = await Contact.countDocuments(filter);
+    const totalTasks = await Task.countDocuments(filter);
 
-    const deals = await Deal.find();
+    const completedTasks = await Task.countDocuments({ ...filter, $or: [{ done: true }, { status: "done" }] });
+    const pendingTasks = await Task.countDocuments({ ...filter, status: { $in: ["todo", "progress"] } });
+
+    const deals = await Deal.find(filter);
     const wonDeals = deals.filter(d => d.stage === "won").length;
     const activeDeals = deals.filter(d => d.stage !== "won" && d.stage !== "lost").length;
 
@@ -30,7 +32,7 @@ router.get("/stats", async (req, res) => {
       .filter(d => d.stage === "won")
       .reduce((sum, d) => sum + (parseFloat(String(d.value).replace(/[^0-9.]/g, "")) || 0), 0);
 
-    const convertedLeadsCount = await Lead.countDocuments({ status: "converted" });
+    const convertedLeadsCount = await Lead.countDocuments({ ...filter, status: "converted" });
     const conversionRate = totalLeads ? Number(((convertedLeadsCount / totalLeads) * 100).toFixed(1)) : 0;
 
     // --- MONTHLY COMPARISONS ---
@@ -47,8 +49,8 @@ router.get("/stats", async (req, res) => {
     };
 
     // 1. Leads
-    const currentLeadsCount = await Lead.countDocuments({ createdAt: { $gte: startOfCurrentMonth } });
-    const previousLeadsCount = await Lead.countDocuments({ createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
+    const currentLeadsCount = await Lead.countDocuments({ ...filter, createdAt: { $gte: startOfCurrentMonth } });
+    const previousLeadsCount = await Lead.countDocuments({ ...filter, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
     const leadsChange = calculateChange(currentLeadsCount, previousLeadsCount);
     const leadsChangeType = currentLeadsCount >= previousLeadsCount ? "up" : "down";
 
@@ -61,12 +63,12 @@ router.get("/stats", async (req, res) => {
     const revenueChangeType = currentRevenue >= previousRevenue ? "up" : "down";
 
     // 3. Conversion Rate
-    const currentTotalLeads = await Lead.countDocuments({ createdAt: { $gte: startOfCurrentMonth } });
-    const currentConvertedLeads = await Lead.countDocuments({ status: "converted", createdAt: { $gte: startOfCurrentMonth } });
+    const currentTotalLeads = await Lead.countDocuments({ ...filter, createdAt: { $gte: startOfCurrentMonth } });
+    const currentConvertedLeads = await Lead.countDocuments({ ...filter, status: "converted", createdAt: { $gte: startOfCurrentMonth } });
     const currentConvRate = currentTotalLeads ? (currentConvertedLeads / currentTotalLeads) * 100 : 0;
 
-    const previousTotalLeads = await Lead.countDocuments({ createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
-    const previousConvertedLeads = await Lead.countDocuments({ status: "converted", createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
+    const previousTotalLeads = await Lead.countDocuments({ ...filter, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
+    const previousConvertedLeads = await Lead.countDocuments({ ...filter, status: "converted", createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
     const previousConvRate = previousTotalLeads ? (previousConvertedLeads / previousTotalLeads) * 100 : 0;
 
     const convRateChange = calculateChange(currentConvRate, previousConvRate);
@@ -85,8 +87,8 @@ router.get("/stats", async (req, res) => {
     const wonDealsChangeType = currentWonDealsCount >= previousWonDealsCount ? "up" : "down";
 
     // 6. Contacts
-    const currentContacts = await Contact.countDocuments({ createdAt: { $gte: startOfCurrentMonth } });
-    const previousContacts = await Contact.countDocuments({ createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
+    const currentContacts = await Contact.countDocuments({ ...filter, createdAt: { $gte: startOfCurrentMonth } });
+    const previousContacts = await Contact.countDocuments({ ...filter, createdAt: { $gte: startOfPreviousMonth, $lt: startOfCurrentMonth } });
     const contactsChange = calculateChange(currentContacts, previousContacts);
     const contactsChangeType = currentContacts >= previousContacts ? "up" : "down";
 
@@ -101,7 +103,7 @@ router.get("/stats", async (req, res) => {
     });
 
     // Lead growth by month
-    const leadsList = await Lead.find();
+    const leadsList = await Lead.find(filter);
     const monthlyLeads = Array.from({ length: 12 }, (_, i) => ({ _id: i + 1, total: 0 }));
     leadsList.forEach(l => {
       const month = new Date(l.createdAt).getMonth() + 1;
@@ -126,7 +128,7 @@ router.get("/stats", async (req, res) => {
     const dealStatusDistribution = Object.entries(stageMap).map(([name, value]) => ({ name, value }));
 
     // --- RECENT ACTIVITIES ---
-    const activities = await Activity.find().sort({ timestamp: -1 }).limit(10);
+    const activities = await Activity.find(filter).sort({ timestamp: -1 }).limit(10);
 
     res.json({
       totalLeads,
@@ -169,9 +171,9 @@ router.get("/", async (req, res) => {
   try {
     const users = await User.countDocuments();
     const tasks = await Task.countDocuments();
-   const pending = await Task.countDocuments({
-  status: { $in: ["todo", "progress"] }
-});
+    const pending = await Task.countDocuments({
+      status: { $in: ["todo", "progress"] }
+    });
 
     res.json({ users, tasks, pending });
   } catch (err) {
@@ -181,7 +183,8 @@ router.get("/", async (req, res) => {
 
 router.get("/tasks-preview", async (req, res) => {
   try {
-    const tasks = await Task.find()
+    const filter = req.user.role === "admin" ? {} : { createdBy: req.user.id };
+    const tasks = await Task.find(filter)
       .sort({ createdAt: -1 })
       .limit(4);
 
