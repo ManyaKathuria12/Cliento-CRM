@@ -1,8 +1,9 @@
 import { Users, IndianRupee, TrendingUp, Handshake, Clock, Sparkles } from "lucide-react";
 import KPICard from "@/components/KPICard";
 import { useEffect, useState } from "react";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 import { io } from "socket.io-client";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   LineChart,
@@ -17,20 +18,20 @@ import {
 } from "recharts";
 
 const Dashboard = () => {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const { user } = useAuth();
   const role = user?.role;
 
   const [stats, setStats] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
-    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    const socket = io(API_BASE_URL, { transports: ["websocket"], withCredentials: true });
 
     const fetchAllData = async () => {
       try {
         const [statsRes, tasksRes] = await Promise.all([
-          fetch("http://localhost:5000/api/dashboard/stats", { headers: getAuthHeaders() }),
-          fetch("http://localhost:5000/api/dashboard/tasks-preview", { headers: getAuthHeaders() })
+          fetch(`${API_BASE_URL}/api/dashboard/stats`, { headers: getAuthHeaders() }),
+          fetch(`${API_BASE_URL}/api/dashboard/tasks-preview`, { headers: getAuthHeaders() })
         ]);
         const statsData = await statsRes.json();
         const tasksData = await tasksRes.json();

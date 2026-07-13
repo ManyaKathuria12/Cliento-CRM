@@ -6,7 +6,7 @@ import {
 import KPICard from "@/components/KPICard";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 
 interface Notification {
   _id?: string;
@@ -71,7 +71,7 @@ const Notifications = () => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/notifications", {
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
         headers: getAuthHeaders(),
       });
       const data = await res.json();
@@ -86,7 +86,7 @@ const Notifications = () => {
   useEffect(() => {
     fetchNotifications();
 
-    const socket = io("http://localhost:5000", {
+    const socket = io(API_BASE_URL, {
       transports: ["websocket"],
       withCredentials: true,
     });
@@ -109,7 +109,7 @@ const Notifications = () => {
     const note = notifications.find((n) => (n._id || n.id) === id);
     if (!note) return;
     try {
-      await fetch(`http://localhost:5000/api/notifications/${id}`, {
+      await fetch(`${API_BASE_URL}/api/notifications/${id}`, {
         method: "PUT",
         headers: {
           ...getAuthHeaders(),
@@ -129,7 +129,7 @@ const Notifications = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`http://localhost:5000/api/notifications/${id}`, {
+      await fetch(`${API_BASE_URL}/api/notifications/${id}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });
@@ -143,7 +143,7 @@ const Notifications = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await fetch("http://localhost:5000/api/notifications/mark-all-read", {
+      await fetch(`${API_BASE_URL}/api/notifications/mark-all-read`, {
         method: "PUT",
         headers: getAuthHeaders(),
       });
@@ -157,7 +157,7 @@ const Notifications = () => {
 
   const handleDeleteAll = async () => {
     try {
-      await fetch("http://localhost:5000/api/notifications/clear-all", {
+      await fetch(`${API_BASE_URL}/api/notifications/clear-all`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });

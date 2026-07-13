@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 import { io } from "socket.io-client";
 
 const COLORS = [
@@ -23,8 +23,8 @@ const Analytics = () => {
   const fetchData = async () => {
     try {
       const [statsRes, dealsRes] = await Promise.all([
-        fetch("http://localhost:5000/api/dashboard/stats", { headers: getAuthHeaders() }),
-        fetch("http://localhost:5000/api/deals", { headers: getAuthHeaders() })
+        fetch(`${API_BASE_URL}/api/dashboard/stats`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE_URL}/api/deals`, { headers: getAuthHeaders() })
       ]);
       const statsData = await statsRes.json();
       const dealsData = await dealsRes.json();
@@ -40,7 +40,7 @@ const Analytics = () => {
   useEffect(() => {
     fetchData();
 
-    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    const socket = io(API_BASE_URL, { transports: ["websocket"], withCredentials: true });
     socket.on("dashboardUpdated", () => {
       fetchData();
     });

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import axios from "axios";
 import { Plus, Shield, Trash2, UserCog } from "lucide-react";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 
 interface User {
   _id: string;
@@ -17,7 +17,7 @@ const AdminUsers = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/users", { headers: getAuthHeaders() });
+      const res = await axios.get(`${API_BASE_URL}/api/users`, { headers: getAuthHeaders() });
       setUsers(res.data);
     } catch (err) {
       console.log(err);
@@ -26,7 +26,7 @@ const AdminUsers = () => {
 
   const updateUser = async (id: string, updates: Partial<User>) => {
     try {
-      await axios.put(`http://localhost:5000/api/users/${id}`, updates, { headers: getAuthHeaders() });
+      await axios.put(`${API_BASE_URL}/api/users/${id}`, updates, { headers: getAuthHeaders() });
       fetchUsers();
     } catch (err) {
       console.log(err);
@@ -35,7 +35,7 @@ const AdminUsers = () => {
 
   const deleteUser = async (id: string) => {
     try {
-      await axios.delete(`http://localhost:5000/api/users/${id}`, { headers: getAuthHeaders() });
+      await axios.delete(`${API_BASE_URL}/api/users/${id}`, { headers: getAuthHeaders() });
       fetchUsers();
     } catch (err) {
       console.log(err);
@@ -45,7 +45,7 @@ const AdminUsers = () => {
   useEffect(() => {
     fetchUsers();
 
-    const socket = io("http://localhost:5000", { transports: ["websocket"] });
+    const socket = io(API_BASE_URL, { transports: ["websocket"] });
     socket.on("connect", () => {
       console.log("AdminUsers socket connected", socket.id);
     });

@@ -1,7 +1,7 @@
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useState, useEffect } from "react";
 import { IndianRupee, Calendar, User, Search, Building, Clock } from "lucide-react";
-import { getAuthHeaders, authFetch } from "@/utils/api";
+import { getAuthHeaders, authFetch, API_BASE_URL } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
@@ -57,7 +57,7 @@ export default function Pipeline() {
   const fetchDeals = async () => {
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/deals", { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE_URL}/api/deals`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to fetch deals");
       const data = await res.json();
       
@@ -98,7 +98,7 @@ export default function Pipeline() {
   useEffect(() => {
     fetchDeals();
 
-    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    const socket = io(API_BASE_URL, { transports: ["websocket"], withCredentials: true });
     socket.on("dashboardUpdated", () => {
       fetchDeals();
     });
@@ -142,7 +142,7 @@ export default function Pipeline() {
 
     try {
       // Persist deal stage to database
-      const res = await fetch(`http://localhost:5000/api/deals/${moved.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/deals/${moved.id}`, {
         method: "PUT",
         headers: {
           ...getAuthHeaders(),

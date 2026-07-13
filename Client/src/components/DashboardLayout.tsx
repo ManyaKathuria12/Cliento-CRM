@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 
 
 
@@ -55,7 +55,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/notifications", { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (Array.isArray(data)) {
         setNotifications(data);
@@ -68,7 +68,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     fetchNotifications();
 
-    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    const socket = io(API_BASE_URL, { transports: ["websocket"], withCredentials: true });
     
     socket.on("dashboardUpdated", () => {
       fetchNotifications();
@@ -223,7 +223,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
     {user?.avatar ? (
       <img
-        src={`http://localhost:5000/uploads/${user.avatar}`}
+        src={`${API_BASE_URL}/uploads/${user.avatar}`}
         alt={`${user?.name || "User"} avatar`}
         className="w-9 h-9 rounded-xl object-cover"
       />

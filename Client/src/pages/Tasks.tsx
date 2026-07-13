@@ -6,7 +6,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
-import { authFetch } from "../utils/api";
+import { authFetch, API_BASE_URL } from "../utils/api";
 import KPICard from "@/components/KPICard";
 
 const isOverdue = (date: string) => {
@@ -102,7 +102,7 @@ const Tasks = () => {
     fetchTasks();
     fetchFiltersData();
 
-    const socket: any = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    const socket: any = io(API_BASE_URL, { transports: ["websocket"], withCredentials: true });
     socket.on("tasksUpdated", () => {
       fetchTasks();
       toast.success("Tasks updated ⚡");

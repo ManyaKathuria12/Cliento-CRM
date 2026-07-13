@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Camera, User, Mail, Phone, Briefcase, FileText } from "lucide-react";
 import toast from "react-hot-toast";
-import { authFetch } from "@/utils/api";
+import { authFetch, API_BASE_URL } from "@/utils/api";
 
 interface ProfileTabProps {
   user: any;
@@ -37,7 +37,7 @@ export default function ProfileTab({ user, onUpdate }: ProfileTabProps) {
 
     const loadingToast = toast.loading("Uploading picture...");
     try {
-      const uploadRes = await fetch("http://localhost:5000/upload", {
+      const uploadRes = await fetch(`${API_BASE_URL}/upload`, {
         method: "POST",
         body: formData,
       });
@@ -115,7 +115,7 @@ export default function ProfileTab({ user, onUpdate }: ProfileTabProps) {
           />
           {avatar ? (
             <img
-              src={avatar.startsWith("http") ? avatar : `http://localhost:5000/uploads/${avatar}`}
+              src={avatar.startsWith("http") ? avatar : `${API_BASE_URL}/uploads/${avatar}`}
               className="w-24 h-24 rounded-full object-cover border-2 border-primary group-hover:opacity-75 transition-opacity"
             />
           ) : (

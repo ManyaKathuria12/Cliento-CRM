@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Camera, Building, Globe, Layers } from "lucide-react";
 import toast from "react-hot-toast";
-import { authFetch } from "@/utils/api";
+import { authFetch, API_BASE_URL } from "@/utils/api";
 
 interface CompanyTabProps {
   user: any;
@@ -35,7 +35,7 @@ export default function CompanyTab({ user, onUpdate }: CompanyTabProps) {
 
     const loadingToast = toast.loading("Uploading logo...");
     try {
-      const uploadRes = await fetch("http://localhost:5000/upload", {
+      const uploadRes = await fetch(`${API_BASE_URL}/upload`, {
         method: "POST",
         body: formData,
       });
@@ -112,7 +112,7 @@ export default function CompanyTab({ user, onUpdate }: CompanyTabProps) {
           />
           {companyLogo ? (
             <img
-              src={`http://localhost:5000/uploads/${companyLogo}`}
+              src={`${API_BASE_URL}/uploads/${companyLogo}`}
               className="w-24 h-24 rounded-2xl object-cover border-2 border-primary group-hover:opacity-75 transition-opacity"
             />
           ) : (

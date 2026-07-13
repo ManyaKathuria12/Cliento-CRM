@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, Filter, Grid3X3, List, Plus, Users, UserPlus, UserCheck, Handshake, TrendingUp, ArrowUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 import KPICard from "@/components/KPICard";
 
 const Leads = () => {
@@ -36,7 +36,7 @@ const Leads = () => {
 
   // FETCH
   const fetchLeads = () => {
-    fetch("http://localhost:5000/api/leads", { headers: getAuthHeaders() })
+    fetch(`${API_BASE_URL}/api/leads`, { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -55,7 +55,7 @@ const Leads = () => {
     if (!name || !company) return alert("Name & Company required");
     if (phone.length !== 10) return alert("Phone number must be exactly 10 digits");
 
-    fetch("http://localhost:5000/api/leads", {
+    fetch(`${API_BASE_URL}/api/leads`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({

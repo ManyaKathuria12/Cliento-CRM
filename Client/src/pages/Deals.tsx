@@ -3,7 +3,7 @@ import {
   IndianRupee, Calendar, User, Search, Filter, ArrowUpDown, 
   Trash2, Edit3, Eye, Plus, Building, Phone, ArrowUpRight
 } from "lucide-react";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
@@ -75,7 +75,7 @@ export default function Deals() {
     fetchDeals();
     fetchLeads();
 
-    const socket = io("http://localhost:5000", { transports: ["websocket"], withCredentials: true });
+    const socket = io(API_BASE_URL, { transports: ["websocket"], withCredentials: true });
     socket.on("dashboardUpdated", () => {
       fetchDeals();
       fetchLeads();
@@ -89,7 +89,7 @@ export default function Deals() {
   const fetchDeals = async () => {
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/deals", { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE_URL}/api/deals`, { headers: getAuthHeaders() });
       const data = await res.json();
       const items = Array.isArray(data) ? data : data?.deals || [];
       
@@ -126,7 +126,7 @@ export default function Deals() {
 
   const fetchLeads = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/leads", { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE_URL}/api/leads`, { headers: getAuthHeaders() });
       const data = await res.json();
       setLeads(data || []);
     } catch (err) {
@@ -136,7 +136,7 @@ export default function Deals() {
 
   const addDeal = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/deals", {
+      const res = await fetch(`${API_BASE_URL}/api/deals`, {
         method: "POST",
         headers: {
           ...getAuthHeaders(),
@@ -164,7 +164,7 @@ export default function Deals() {
   const deleteDeal = async () => {
     if (!dealToDelete) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/deals/${dealToDelete}`, { 
+      const res = await fetch(`${API_BASE_URL}/api/deals/${dealToDelete}`, { 
         method: "DELETE", 
         headers: getAuthHeaders() 
       });
@@ -183,7 +183,7 @@ export default function Deals() {
   const updateDeal = async () => {
     if (!selectedDeal) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/deals/${selectedDeal.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/deals/${selectedDeal.id}`, {
         method: "PUT",
         headers: {
           ...getAuthHeaders(),

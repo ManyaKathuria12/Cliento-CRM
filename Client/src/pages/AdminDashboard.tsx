@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { Users, UserCheck, ClipboardList, CheckCircle, TrendingUp } from "lucide-react";
 import axios from "axios";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -17,9 +17,9 @@ export default function AdminDashboard() {
     const loadData = async () => {
       try {
         const [usersRes, leadsRes, dealsRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/users", { headers: getAuthHeaders() }),
-          axios.get("http://localhost:5000/api/leads", { headers: getAuthHeaders() }),
-          axios.get("http://localhost:5000/api/deals", { headers: getAuthHeaders() }),
+          axios.get(`${API_BASE_URL}/api/users`, { headers: getAuthHeaders() }),
+          axios.get(`${API_BASE_URL}/api/leads`, { headers: getAuthHeaders() }),
+          axios.get(`${API_BASE_URL}/api/deals`, { headers: getAuthHeaders() }),
         ]);
 
         const deals = dealsRes.data || [];
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
 
     loadData();
 
-    const socket = io("http://localhost:5000", { transports: ["websocket"] });
+    const socket = io(API_BASE_URL, { transports: ["websocket"] });
 
     socket.on("connect", () => {
       console.log("AdminDashboard socket connected", socket.id);

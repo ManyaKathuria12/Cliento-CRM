@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 import {
   ArrowLeft,
   Building2,
@@ -64,7 +64,7 @@ const LeadDetails = () => {
   const fetchLead = async () => {
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/leads/${id}`,
+        `${API_BASE_URL}/api/leads/${id}`,
         { headers: getAuthHeaders() }
       );
 
@@ -100,7 +100,7 @@ const LeadDetails = () => {
 
     try {
       const res = await axios.put(
-        `http://localhost:5000/api/leads/${id}`,
+        `${API_BASE_URL}/api/leads/${id}`,
         {
           name: formData.name,
           company: formData.company,
@@ -127,7 +127,7 @@ const LeadDetails = () => {
   const handleConvert = async () => {
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/deals",
+        `${API_BASE_URL}/api/deals`,
         {
           leadId: lead?._id,
           title: `${lead?.name} Deal`,
@@ -155,7 +155,7 @@ const LeadDetails = () => {
   const handleDelete = async () => {
     try {
       await axios.delete(
-        `http://localhost:5000/api/leads/${id}`,
+        `${API_BASE_URL}/api/leads/${id}`,
         { headers: getAuthHeaders() }
       );
       alert("Lead deleted successfully");
@@ -172,7 +172,7 @@ const LeadDetails = () => {
     if (!noteText.trim()) return;
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/leads/${id}/notes`,
+        `${API_BASE_URL}/api/leads/${id}/notes`,
         { text: noteText },
         { headers: getAuthHeaders() }
       );
@@ -190,7 +190,7 @@ const LeadDetails = () => {
     if (!followupText.trim()) return;
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/leads/${id}/followups`,
+        `${API_BASE_URL}/api/leads/${id}/followups`,
         { text: followupText, method: followupMethod },
         { headers: getAuthHeaders() }
       );
@@ -208,7 +208,7 @@ const LeadDetails = () => {
     if (!taskText.trim()) return;
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/leads/${id}/tasks`,
+        `${API_BASE_URL}/api/leads/${id}/tasks`,
         { text: taskText, due: taskDue || undefined },
         { headers: getAuthHeaders() }
       );
@@ -225,7 +225,7 @@ const LeadDetails = () => {
   const handleToggleTask = async (taskId: string, currentDone: boolean) => {
     try {
       const res = await axios.put(
-        `http://localhost:5000/api/leads/${id}/tasks/${taskId}`,
+        `${API_BASE_URL}/api/leads/${id}/tasks/${taskId}`,
         { done: !currentDone },
         { headers: getAuthHeaders() }
       );

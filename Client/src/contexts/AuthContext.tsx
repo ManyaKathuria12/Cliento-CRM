@@ -10,9 +10,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<any>(
-    JSON.parse(localStorage.getItem("user") || "null")
-  );
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored && stored !== "undefined" && stored !== "null") {
+        return JSON.parse(stored);
+      }
+    } catch (err) {
+      console.error("Failed to parse user from localStorage:", err);
+      // Clean up corrupted storage
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+    }
+    return null;
+  });
   const queryClient = useQueryClient();
 
   const logout = () => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, Phone, Mail, MapPin, Building, Users, Clock, Sparkles } from "lucide-react";
-import { getAuthHeaders } from "@/utils/api";
+import { getAuthHeaders, API_BASE_URL } from "@/utils/api";
 import KPICard from "@/components/KPICard";
 
 const phoneRegex = /^\d{10}$/;
@@ -28,7 +28,7 @@ const Contacts = () => {
   // 🔥 FETCH FROM BACKEND
   const fetchContacts = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/contacts", { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE_URL}/api/contacts`, { headers: getAuthHeaders() });
       const data = await res.json();
       setContacts(data || []);
     } catch (err) {
@@ -36,7 +36,7 @@ const Contacts = () => {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/api/contacts/stats", { headers: getAuthHeaders() });
+      const res = await fetch(`${API_BASE_URL}/api/contacts/stats`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -70,13 +70,13 @@ const Contacts = () => {
     if (!phoneRegex.test(form.phone)) return alert("Phone number must be exactly 10 digits");
 
     if (editingContact) {
-      await fetch(`http://localhost:5000/api/contacts/${editingContact._id}`, {
+      await fetch(`${API_BASE_URL}/api/contacts/${editingContact._id}`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(form),
       });
     } else {
-      await fetch("http://localhost:5000/api/contacts", {
+      await fetch(`${API_BASE_URL}/api/contacts`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(form),
@@ -93,7 +93,7 @@ const Contacts = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this contact?")) return;
 
-    await fetch(`http://localhost:5000/api/contacts/${id}`, {
+    await fetch(`${API_BASE_URL}/api/contacts/${id}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
     });

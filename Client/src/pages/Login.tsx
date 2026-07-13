@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/contexts/AuthContext";
+import { API_BASE_URL } from "@/utils/api";
 
 const Login = () => {
   const [isSignup, setIsSignup] = useState(false);
@@ -21,41 +22,70 @@ const Login = () => {
   const { setUser } = useAuth();
 
   // 🔐 LOGIN / SIGNUP
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
 
-  try {
-    const res = await fetch("http://localhost:5000/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const endpoint = isSignup ? `${API_BASE_URL}/api/auth/signup` : `${API_BASE_URL}/api/auth/login`;
+      const body = isSignup 
+        ? { name: fullName, email, password }
+        : { email, password };
 
-    const data = await res.json();
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    if (!res.ok) {
-      alert(data.message || "Login failed ❌");
-      return;
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast({ title: data.message || "Failed ❌", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      if (isSignup) {
+        // Auto-login after successful signup
+        const loginRes = await fetch(`${API_BASE_URL}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const loginData = await loginRes.json();
+        if (!loginRes.ok) {
+          toast({ title: loginData.message || "Auto-login failed ❌", variant: "destructive" });
+          setIsLoading(false);
+          return;
+        }
+        if (loginData.user) {
+          localStorage.setItem("user", JSON.stringify(loginData.user));
+          setUser(loginData.user);
+        }
+        if (loginData.token) {
+          localStorage.setItem("token", loginData.token);
+        }
+        toast({ title: "Account created and logged in! 🎉" });
+        navigate(loginData.user?.role === "admin" ? "/admin" : "/dashboard");
+      } else {
+        if (data.user) {
+          localStorage.setItem("user", JSON.stringify(data.user));
+          setUser(data.user);
+        }
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+        }
+        toast({ title: "Welcome back! 👋" });
+        navigate(data.user.role === "admin" ? "/admin" : "/dashboard");
+      }
+
+    } catch (err) {
+      toast({ title: "Error occurred ❌", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
-
-    // 🔥 user save
-    localStorage.setItem("user", JSON.stringify(data.user));
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-    }
-    setUser(data.user);
-
-    // 🔥 role-based redirect
-    if (data.user.role === "admin") {
-      navigate("/admin");
-    } else {
-      navigate("/dashboard");
-    }
-
-  } catch (err) {
-    alert("Error ❌");
-  }
-};
+  };
 
   // 🔥 GOOGLE LOGIN (FINAL FIXED)
   const googleLogin = useGoogleLogin({
@@ -71,7 +101,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         const googleUser = await res.json();
 
         // 2️⃣ Send to backend
-        const backendRes = await fetch("http://localhost:5000/api/auth/google", {
+        const backendRes = await fetch(`${API_BASE_URL}/api/auth/google`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -82,20 +112,24 @@ const handleSubmit = async (e: React.FormEvent) => {
         const data = await backendRes.json();
 
         // 3️⃣ Save properly (_id included)
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setUser(data.user);
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+        }
+        if (data.user) {
+          localStorage.setItem("user", JSON.stringify(data.user));
+          setUser(data.user);
+        }
 
         console.log("GOOGLE USER:", data.user);
 
         toast({ title: "Google login success ✅" });
-      if (data.user.role === "admin") {
-  navigate("/admin");
-} else if (data.user.role === "manager") {
-  navigate("/manager");
-} else {
-  navigate("/dashboard");
-}
+        if (data.user?.role === "admin") {
+          navigate("/admin");
+        } else if (data.user?.role === "manager") {
+          navigate("/manager");
+        } else if (data.user) {
+          navigate("/dashboard");
+        }
 
       } catch (err) {
         console.log("GOOGLE LOGIN ERROR:", err);
@@ -108,25 +142,12 @@ const handleSubmit = async (e: React.FormEvent) => {
   });
 
   // 🔥 FORGOT PASSWORD
-  const handleForgotPassword = async () => {
-    if (!email) {
-      toast({ title: "Enter email first ⚠️" });
-      return;
-    }
-
-    try {
-      await fetch("http://localhost:5000/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      toast({ title: "Reset link sent 📩" });
-    } catch {
-      toast({ title: "Error ❌", variant: "destructive" });
-    }
+  const handleForgotPassword = () => {
+    toast({
+      title: "Password Reset Unavailable ⚠️",
+      description: "Password reset is disabled in this demo. Please use Google Login or contact the system administrator.",
+      variant: "destructive",
+    });
   };
 
   return (
