@@ -27,10 +27,11 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: process.env.CLIENT_URL,
+    methods: ["GET", "POST"],
+    credentials: true
   },
-  transports: ["websocket"] // 🔥 ADD THIS
+  transports: ["websocket"]
 });
 
 io.on("connection", (socket) => {
@@ -109,7 +110,10 @@ mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/cliento")
   .catch(err => console.log(err));
 
 // 🔥 MIDDLEWARE
-app.use(cors({ origin: "*" }));
+app.use(cors({
+  origin: process.env.CLIENT_URL,
+  credentials: true
+}));
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 app.use("/api/public", publicRoutes);
