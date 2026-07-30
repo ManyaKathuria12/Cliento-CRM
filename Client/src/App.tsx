@@ -37,7 +37,7 @@ const queryClient = new QueryClient();
 
 
 const App = () => (
-  <GoogleOAuthProvider clientId="908300278480-o2qi1otj79n56m04sbbne7ssh7jb6e0v.apps.googleusercontent.com">
+  <GoogleOAuthProvider clientId="69957078183-bn4a6r6bjjipo436t1dvtilim24feaba.apps.googleusercontent.com">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
   <HotToast />
