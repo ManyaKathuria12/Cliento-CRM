@@ -215,7 +215,7 @@ const Login = () => {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm space-y-5 glass glow-cyan p-6 rounded-2xl"
+          className="w-full max-w-sm space-y-5 glass-dark p-6 rounded-2xl"
         >
 
           <h1 className="text-2xl font-bold text-center">
