@@ -11,6 +11,7 @@ import {
   Clock, Camera
 } from "lucide-react";
 import { authFetch, API_BASE_URL } from "../utils/api";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Session {
   id: string;
@@ -217,25 +218,23 @@ const Profile = () => {
     const loadingToast = toast.loading("Uploading picture...");
 
     try {
-      const uploadRes = await fetch(`${API_BASE_URL}/upload`, {
-        method: "POST",
-        body: formData,
-      });
+      // Upload directly to Supabase Storage (permanent, not wiped on server restart)
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user?._id}-${Date.now()}.${fileExt}`;
 
-      if (!uploadRes.ok) {
-        throw new Error("Failed to upload avatar to server");
-      }
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file, { upsert: true });
 
-      const { file: filename } = await uploadRes.json();
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
+      const publicUrl = urlData.publicUrl;
 
       const updateRes = await authFetch(`/auth/profile/${user?._id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          avatar: filename,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar: publicUrl }),
       });
 
       if (!updateRes.ok) {
@@ -394,7 +393,8 @@ const Profile = () => {
             />
             {user?.avatar ? (
               <img
-                src={user.avatar.startsWith("http") ? user.avatar : `${API_BASE_URL}/uploads/${user.avatar}`}
+                src={user.avatar}
+                alt="Profile"
                 className="w-24 h-24 rounded-full object-cover border-2 border-primary group-hover:opacity-75 transition-opacity"
               />
             ) : (
