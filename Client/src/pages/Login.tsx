@@ -151,7 +151,61 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+
+      {/* ✨ Animated Background Orbs */}
+      <div className="absolute inset-0 pointer-events-none">
+        {/* Orb 1 — teal, top left */}
+        <div style={{
+          position: "absolute", top: "-10%", left: "-10%",
+          width: "500px", height: "500px", borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(20,184,166,0.35) 0%, transparent 70%)",
+          filter: "blur(60px)",
+          animation: "orbFloat1 12s ease-in-out infinite",
+        }} />
+        {/* Orb 2 — cyan, bottom right */}
+        <div style={{
+          position: "absolute", bottom: "-15%", right: "-10%",
+          width: "550px", height: "550px", borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(6,182,212,0.3) 0%, transparent 70%)",
+          filter: "blur(70px)",
+          animation: "orbFloat2 15s ease-in-out infinite",
+        }} />
+        {/* Orb 3 — purple, top right */}
+        <div style={{
+          position: "absolute", top: "10%", right: "5%",
+          width: "350px", height: "350px", borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)",
+          filter: "blur(50px)",
+          animation: "orbFloat3 18s ease-in-out infinite",
+        }} />
+        {/* Orb 4 — teal, center bottom */}
+        <div style={{
+          position: "absolute", bottom: "5%", left: "30%",
+          width: "300px", height: "300px", borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 70%)",
+          filter: "blur(45px)",
+          animation: "orbFloat1 20s ease-in-out infinite reverse",
+        }} />
+      </div>
+
+      {/* CSS Keyframes injected inline */}
+      <style>{`
+        @keyframes orbFloat1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33%       { transform: translate(40px, -30px) scale(1.05); }
+          66%       { transform: translate(-20px, 40px) scale(0.97); }
+        }
+        @keyframes orbFloat2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33%       { transform: translate(-50px, 30px) scale(1.08); }
+          66%       { transform: translate(30px, -40px) scale(0.95); }
+        }
+        @keyframes orbFloat3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50%       { transform: translate(-30px, 50px) scale(1.1); }
+        }
+      `}</style>
 
       <div className="absolute top-6 left-8">
         <Logo size="sm" />
