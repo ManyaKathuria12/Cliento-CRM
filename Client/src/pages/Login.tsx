@@ -199,7 +199,7 @@ const Login = () => {
             )}
 
             <div className="relative">
-              <Mail className="absolute left-3 top-3" size={16} />
+              <Mail className="absolute left-3 top-3 text-gray-400" size={16} />
               <input
                 type="email"
                 value={email}
@@ -210,7 +210,7 @@ const Login = () => {
             </div>
 
             <div className="relative">
-              <Lock className="absolute left-3 top-3" size={16} />
+              <Lock className="absolute left-3 top-3 text-gray-400" size={16} />
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
@@ -223,7 +223,7 @@ const Login = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-2"
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={16} className="text-gray-400" /> : <Eye size={16} className="text-gray-400" />}
               </button>
             </div>
 
