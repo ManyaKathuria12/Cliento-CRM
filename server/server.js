@@ -5,6 +5,7 @@ const cors = require("cors");
 const nodemailer = require("nodemailer");
 const multer = require("multer");
 const mongoose = require("mongoose");
+const { rateLimit } = require("express-rate-limit");
 const authRoutes = require("./routes/auth");
 const contactRoutes = require("./routes/contact");
 const leadRoutes = require("./routes/lead");
@@ -66,48 +67,55 @@ const migrateDatabase = async () => {
     const Notification = require("./models/Notification");
     const Activity = require("./models/Activity");
 
-    // Target user is the original sales demo account (Manya Kathuria)
-    const targetUserId = "69ef9f0044d8abb2c360b923";
-    const user = await User.findById(targetUserId);
-    if (!user) {
-      console.log("⚠️ Original demo user (Manya Kathuria) not found in database.");
+    // Only migrate records that have no owner assigned yet
+    const unownedLeads = await Lead.countDocuments({ createdBy: { $exists: false } });
+    if (unownedLeads === 0) {
+      console.log("✅ No orphaned records to migrate.");
       return;
     }
+
+    // Find the first admin/owner user in the database dynamically
+    const targetUser = await User.findOne({ role: { $in: ["admin", "owner", "sales"] } }).sort({ createdAt: 1 });
+    if (!targetUser) {
+      console.log("⚠️  No users found in database — skipping migration.");
+      return;
+    }
+    const targetUserId = targetUser._id;
 
     // Migrate Leads
     const leadsResult = await Lead.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
     if (leadsResult.modifiedCount > 0) {
-      console.log(`✅ Migrated ${leadsResult.modifiedCount} Leads to Original User ${user.email}`);
+      console.log(`✅ Migrated ${leadsResult.modifiedCount} Leads to user ${targetUser.email}`);
     }
 
     // Migrate Contacts
     const contactsResult = await Contact.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
     if (contactsResult.modifiedCount > 0) {
-      console.log(`✅ Migrated ${contactsResult.modifiedCount} Contacts to Original User ${user.email}`);
+      console.log(`✅ Migrated ${contactsResult.modifiedCount} Contacts to user ${targetUser.email}`);
     }
 
     // Migrate Deals
     const dealsResult = await Deal.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
     if (dealsResult.modifiedCount > 0) {
-      console.log(`✅ Migrated ${dealsResult.modifiedCount} Deals to Original User ${user.email}`);
+      console.log(`✅ Migrated ${dealsResult.modifiedCount} Deals to user ${targetUser.email}`);
     }
 
     // Migrate Tasks
     const tasksResult = await Task.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
     if (tasksResult.modifiedCount > 0) {
-      console.log(`✅ Migrated ${tasksResult.modifiedCount} Tasks to Original User ${user.email}`);
+      console.log(`✅ Migrated ${tasksResult.modifiedCount} Tasks to user ${targetUser.email}`);
     }
 
     // Migrate Notifications
     const notificationsResult = await Notification.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
     if (notificationsResult.modifiedCount > 0) {
-      console.log(`✅ Migrated ${notificationsResult.modifiedCount} Notifications to Original User ${user.email}`);
+      console.log(`✅ Migrated ${notificationsResult.modifiedCount} Notifications to user ${targetUser.email}`);
     }
 
     // Migrate Activities
     const activitiesResult = await Activity.updateMany({ createdBy: { $exists: false } }, { $set: { createdBy: targetUserId } });
     if (activitiesResult.modifiedCount > 0) {
-      console.log(`✅ Migrated ${activitiesResult.modifiedCount} Activities to Original User ${user.email}`);
+      console.log(`✅ Migrated ${activitiesResult.modifiedCount} Activities to user ${targetUser.email}`);
     }
 
   } catch (err) {
@@ -135,17 +143,38 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+
+// 🛡️ Body size limit — prevents large payload attacks
+app.use(express.json({ limit: "5mb" }));
 app.use("/uploads", express.static("uploads"));
+
+// 🛡️ General API rate limit — 100 requests per 15 minutes per IP
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
+// 🛡️ Auth rate limit — max 10 login/signup attempts per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts, please try again in 15 minutes." },
+});
+
+app.use("/api", generalLimiter);
 app.use("/api/public", publicRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api", userRoutes);
 
-
-// 🔐 AUTH ROUTES (LOGIN / SIGNUP)
-app.use("/api/auth", authRoutes);
+// 🔐 AUTH ROUTES — with strict rate limiting
+app.use("/api/auth", authLimiter, authRoutes);
 
 app.use("/api/leads", leadRoutes);
 app.use("/api/contacts", contactRoutes);
@@ -170,22 +199,24 @@ app.post("/upload", upload.single("avatar"), (req, res) => {
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.GMAIL_USER || "manyakathuria12@gmail.com",
-    pass: process.env.GMAIL_PASS || "onqo jbnr cifo qyjb", // app password
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
   },
 });
 
 
 
-// 🔥 FORGOT PASSWORD (basic version)
+// 🔥 FORGOT PASSWORD
 app.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
 
-  const resetLink = `${process.env.FRONTEND_URL || "http://localhost:8080"}/reset-password`;
+  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  const resetLink = `${process.env.FRONTEND_URL}/reset-password`;
 
   try {
     await transporter.sendMail({
-      from: process.env.GMAIL_USER || "manyakathuria12@gmail.com",
+      from: process.env.GMAIL_USER,
       to: email,
       subject: "Password Reset",
       html: `

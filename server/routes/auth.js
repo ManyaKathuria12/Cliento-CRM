@@ -22,6 +22,19 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "All fields required ❌" });
     }
 
+    if (name.trim().length < 2 || name.trim().length > 50) {
+      return res.status(400).json({ message: "Name must be 2–50 characters ❌" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format ❌" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters ❌" });
+    }
+
     // 🔍 CHECK EXISTING USER
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -66,6 +79,11 @@ router.post("/login", async (req, res) => {
     // 🔥 VALIDATION
     if (!email || !password) {
       return res.status(400).json({ message: "Missing fields ❌" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format ❌" });
     }
 
     // 🔍 FIND USER
