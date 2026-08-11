@@ -11,7 +11,28 @@ import {
   Clock, Camera
 } from "lucide-react";
 import { authFetch, API_BASE_URL } from "../utils/api";
-import { supabase } from "@/integrations/supabase/client";
+
+// Resize & compress image → base64 (max 256x256, JPEG 80%)
+const resizeImageToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target?.result as string;
+      img.onload = () => {
+        const MAX = 256;
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
+  });
 
 interface Session {
   id: string;
@@ -212,46 +233,29 @@ const Profile = () => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("avatar", file);
-
     const loadingToast = toast.loading("Uploading picture...");
 
     try {
-      // Upload directly to Supabase Storage (permanent, not wiped on server restart)
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user?._id}-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
-      const publicUrl = urlData.publicUrl;
+      // Resize & convert to base64, save directly to DB (no external storage needed)
+      const base64 = await resizeImageToBase64(file);
 
       const updateRes = await authFetch(`/auth/profile/${user?._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatar: publicUrl }),
+        body: JSON.stringify({ avatar: base64 }),
       });
 
       if (!updateRes.ok) {
-        throw new Error("Failed to save avatar database changes");
+        throw new Error("Failed to save avatar");
       }
 
       const updatedUserRes = await updateRes.json();
-
-      const updatedUser = {
-        ...user,
-        avatar: updatedUserRes.avatar,
-      };
+      const updatedUser = { ...user, avatar: updatedUserRes.avatar };
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
 
       toast.dismiss(loadingToast);
-      toast.success("Profile picture updated successfully!");
+      toast.success("Profile picture updated! ✅");
       fetchStats(user._id, true);
       fetchActivities(user._id, true);
     } catch (err: any) {

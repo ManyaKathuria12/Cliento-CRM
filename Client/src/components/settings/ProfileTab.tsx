@@ -2,7 +2,28 @@ import { useState, useRef } from "react";
 import { Camera, User, Mail, Phone, Briefcase, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import { authFetch } from "@/utils/api";
-import { supabase } from "@/integrations/supabase/client";
+
+// Resize & compress image → base64 (max 256x256, JPEG 80%)
+const resizeImageToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target?.result as string;
+      img.onload = () => {
+        const MAX = 256;
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
+  });
 
 interface ProfileTabProps {
   user: any;
@@ -35,25 +56,14 @@ export default function ProfileTab({ user, onUpdate }: ProfileTabProps) {
 
     const loadingToast = toast.loading("Uploading picture...");
     try {
-      // Upload directly to Supabase Storage (permanent, not wiped on server restart)
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user?._id}-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
-      const publicUrl = data.publicUrl;
-
-      setAvatar(publicUrl);
+      // Resize & convert to base64, then store directly in DB (no external storage needed)
+      const base64 = await resizeImageToBase64(file);
+      setAvatar(base64);
       toast.dismiss(loadingToast);
-      toast.success("Image uploaded! Click 'Save Changes' to apply.");
+      toast.success("Image ready! Click 'Save Changes' to apply. ✅");
     } catch (err: any) {
       toast.dismiss(loadingToast);
-      toast.error("Failed to upload avatar ❌");
+      toast.error("Failed to process image ❌");
     }
   };
 
