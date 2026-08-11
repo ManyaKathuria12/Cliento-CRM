@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    historyApiFallback: true,
     proxy: {
       "/api": {
         target: "http://localhost:5000",

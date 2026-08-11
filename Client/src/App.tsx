@@ -37,11 +37,11 @@ const queryClient = new QueryClient();
 
 
 const App = () => (
-  <GoogleOAuthProvider clientId="69957078183-bn4a6r6bjjipo436t1dvtilim24feaba.apps.googleusercontent.com">
+  <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-  <HotToast />
-  <Sonner />
+        <HotToast />
+        <Sonner />
         <BrowserRouter>
           <AuthProvider>
             <Routes>
@@ -53,115 +53,115 @@ const App = () => (
                   <Navigate to="/settings?tab=profile" replace />
                 </ProtectedRoute>
               } />
-            
-            
+
+
 
               {/* 🔥 RESET PASSWORD ROUTE */}
               <Route path="/reset-password" element={<ResetPassword />} />
 
-             <Route path="/dashboard" element={
-  <ProtectedRoute roleRequired="sales">
-    <DashboardLayout><Dashboard /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route path="/dashboard" element={
+                <ProtectedRoute roleRequired="sales">
+                  <DashboardLayout><Dashboard /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
               <Route path="/manager" element={
-  <ProtectedRoute roleRequired="manager">
-    <DashboardLayout><Dashboard /></DashboardLayout>
-  </ProtectedRoute>
-} />
+                <ProtectedRoute roleRequired="manager">
+                  <DashboardLayout><Dashboard /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
-             <Route path="/leads" element={
-  <ProtectedRoute roleRequired="sales">
-    <DashboardLayout><Leads /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route path="/leads" element={
+                <ProtectedRoute roleRequired="sales">
+                  <DashboardLayout><Leads /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
-<Route
-  path="/leads/:id"
-  element={
-    <ProtectedRoute roleRequired="sales">
-      <DashboardLayout>
-        <LeadDetails />
-      </DashboardLayout>
-    </ProtectedRoute>
-  }
-/>
-             <Route path="/contacts" element={
-  <ProtectedRoute roleRequired="sales">
-    <DashboardLayout><Contacts /></DashboardLayout>
-  </ProtectedRoute>
-} />
-            <Route path="/deals" element={
-  <ProtectedRoute roleRequired={["sales", "manager"]}>
-    <DashboardLayout><Deals /></DashboardLayout>
-  </ProtectedRoute>
-} />
-            <Route path="/pipeline" element={
-  <ProtectedRoute roleRequired={["sales", "manager"]}>
-    <DashboardLayout><Pipeline /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route
+                path="/leads/:id"
+                element={
+                  <ProtectedRoute roleRequired="sales">
+                    <DashboardLayout>
+                      <LeadDetails />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/contacts" element={
+                <ProtectedRoute roleRequired="sales">
+                  <DashboardLayout><Contacts /></DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/deals" element={
+                <ProtectedRoute roleRequired={["sales", "manager"]}>
+                  <DashboardLayout><Deals /></DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/pipeline" element={
+                <ProtectedRoute roleRequired={["sales", "manager"]}>
+                  <DashboardLayout><Pipeline /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
-      <Route path="/tasks" element={
-  <ProtectedRoute roleRequired="sales">
-    <DashboardLayout><Tasks /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route path="/tasks" element={
+                <ProtectedRoute roleRequired="sales">
+                  <DashboardLayout><Tasks /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
               <Route path="/tasks/:id" element={
-  <ProtectedRoute roleRequired="sales">
-    <DashboardLayout><TaskDetail /></DashboardLayout>
-  </ProtectedRoute>
-} />
+                <ProtectedRoute roleRequired="sales">
+                  <DashboardLayout><TaskDetail /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
-<Route path="/analytics" element={
-  <ProtectedRoute roleRequired="manager">
-    <DashboardLayout><Analytics /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route path="/analytics" element={
+                <ProtectedRoute roleRequired="manager">
+                  <DashboardLayout><Analytics /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
-<Route path="/ai-chat" element={
-  <ProtectedRoute>
-    <DashboardLayout><AIChat /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route path="/ai-chat" element={
+                <ProtectedRoute>
+                  <DashboardLayout><AIChat /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
-<Route path="/settings" element={
-  <ProtectedRoute>
-    <DashboardLayout><SettingsPage /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <DashboardLayout><SettingsPage /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
-<Route path="/notifications" element={
-  <ProtectedRoute>
-    <DashboardLayout><Notifications /></DashboardLayout>
-  </ProtectedRoute>
-} />
+              <Route path="/notifications" element={
+                <ProtectedRoute>
+                  <DashboardLayout><Notifications /></DashboardLayout>
+                </ProtectedRoute>
+              } />
 
               <Route path="*" element={<NotFound />} />
 
               <Route
-  path="/admin"
-  element={
-    <ProtectedRoute roleRequired="admin">
-      <DashboardLayout>
-        <AdminDashboard />
-      </DashboardLayout>
-    </ProtectedRoute>
-  }
-/>
+                path="/admin"
+                element={
+                  <ProtectedRoute roleRequired="admin">
+                    <DashboardLayout>
+                      <AdminDashboard />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-<Route
-  path="/admin/users"
-  element={
-    <ProtectedRoute roleRequired="admin">
-      <DashboardLayout>
-        <AdminUsers />   
-      </DashboardLayout>
-    </ProtectedRoute>
-  }
-/>
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute roleRequired="admin">
+                    <DashboardLayout>
+                      <AdminUsers />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
 
 
 

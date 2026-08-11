@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
@@ -25,13 +26,26 @@ const { Server } = require("socket.io");
 
 const server = http.createServer(app);
 
+const allowedOrigins = [
+  // Local dev
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:3000",
+  "http://localhost:8080",
+  "http://localhost:8081",
+  "http://localhost:8082",
+  // Production — set these in Render's environment variables
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+];
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL,
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true
   },
-  transports: ["websocket"]
+  transports: ["websocket", "polling"]
 });
 
 io.on("connection", (socket) => {
@@ -111,7 +125,14 @@ mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/cliento")
 
 // 🔥 MIDDLEWARE
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -183,13 +204,33 @@ app.post("/forgot-password", async (req, res) => {
 
 
 
-// ✅ TEST
-app.get("/", (req, res) => {
-  res.send("Backend running 🚀");
+// ✅ Serve React frontend in production
+const distPath = path.join(__dirname, "../Client/dist");
+app.use(express.static(distPath));
+
+// ✅ SPA fallback — return index.html for all non-API routes so React Router works on refresh
+app.get(/.*/, (req, res) => {
+  // Don't intercept API or upload routes
+  if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  res.sendFile(path.join(distPath, "index.html"));
 });
 
 // 🚀 START SERVER
 const PORT = process.env.PORT || 5000;
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `Port ${PORT} is already in use. Stop the other process or set a different PORT in .env.`
+    );
+  } else {
+    console.error("Server error:", err);
+  }
+  process.exit(1);
+});
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
