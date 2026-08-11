@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Camera, User, Mail, Phone, Briefcase, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import { authFetch } from "@/utils/api";
@@ -39,6 +39,11 @@ export default function ProfileTab({ user, onUpdate }: ProfileTabProps) {
   const [avatar, setAvatar] = useState(user?.avatar || "");
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Re-sync avatar when user prop updates (e.g. after save or page refresh)
+  useEffect(() => {
+    setAvatar(user?.avatar || "");
+  }, [user?.avatar]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

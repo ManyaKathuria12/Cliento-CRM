@@ -223,7 +223,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
     {user?.avatar ? (
       <img
-        src={`${API_BASE_URL}/uploads/${user.avatar}`}
+        src={user.avatar.startsWith("data:") || user.avatar.startsWith("http") ? user.avatar : `${API_BASE_URL}/uploads/${user.avatar}`}
         alt={`${user?.name || "User"} avatar`}
         className="w-9 h-9 rounded-xl object-cover"
       />
